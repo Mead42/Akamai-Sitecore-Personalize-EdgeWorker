@@ -544,11 +544,14 @@
     decision to the Akamai edge, <em>before</em> cache lookup. Akamai asks Personalize which variant
     the visitor belongs to, then serves that variant's already-cached HTML. The visitor's address bar
     still says <code>/</code>; only Akamai's cache key and the forward request know about the variant.
+    <br><br>
+    The homepage has <strong>four variants, and every one of them is a signed-in state</strong> &mdash;
+    booked, courtesy hold, non-booked, recently searched. That single fact shapes most of what follows.
   </p>
 
   <div class="facts">
-    <div class="fact"><div class="v">5 + 1</div><div class="k">page variants plus a <code>default</code> bucket — six cache entries for one URL</div></div>
-    <div class="fact"><div class="v">2</div><div class="k">sub-requests on a first visit, 1 for a returning visitor, 0 with <code>?pv=</code></div></div>
+    <div class="fact"><div class="v">4 + 1</div><div class="k">signed-in variants plus a <code>default</code> bucket &mdash; five cache entries for one URL</div></div>
+    <div class="fact"><div class="v">0</div><div class="k">of the four variants can match a signed-out visitor, so <code>default</code> is the busiest bucket</div></div>
     <div class="fact"><div class="v">2.5s</div><div class="k">worst-case configured timeout ceiling before the worker fails open</div></div>
     <div class="fact"><div class="v">Every</div><div class="k">personalized request still executes the flow &mdash; cache hits included, so CDP analytics stay accurate</div></div>
   </div>
@@ -560,8 +563,8 @@
     <p class="sec-sub">Six things happen. Everything else on this page is a zoom-in on one of them.</p>
     <div class="plain">
       <div><div class="step-n">A</div><h4>The request reaches Akamai</h4><p>A visitor asks for the homepage. It lands on the nearest Akamai edge server, not on our servers.</p></div>
-      <div><div class="step-n">B</div><h4>Akamai identifies the visitor</h4><p>It looks for a Sitecore Personalize browser id in a cookie. If there isn't one, it asks Personalize to mint a new one.</p></div>
-      <div><div class="step-n">C</div><h4>Personalize picks a variant</h4><p>Akamai calls the Personalize flow with the visitor's context. The flow answers with one of five homepage variants — or nothing, which means "show the standard page".</p></div>
+      <div><div class="step-n">B</div><h4>Akamai gathers the visitor's context</h4><p>It reads the visitor's cookies &mdash; including <code>cclUser</code>, which only exists once someone has signed in &mdash; and their Personalize browser id.</p></div>
+      <div><div class="step-n">C</div><h4>Personalize picks a variant</h4><p>Akamai calls the Personalize flow with that context. The flow answers with one of four signed-in variants &mdash; or nothing, which means &ldquo;show the standard page&rdquo;.</p></div>
       <div><div class="step-n">D</div><h4>Akamai checks its cache for that variant</h4><p>Each variant has its own cached copy of the homepage. If Akamai already holds one, it is returned immediately and our origin is never touched.</p></div>
       <div><div class="step-n">E</div><h4>Only on a miss: the origin renders</h4><p>Akamai fetches that one variant from the Next.js app running in Kubernetes, then stores it for everyone else in the same bucket.</p></div>
       <div><div class="step-n">F</div><h4>The visitor gets the page, analytics get the decision</h4><p>Cookies carry the browser id and the decision back to the browser, which forwards it to GTM and Tealium. The URL never changed.</p></div>
@@ -582,11 +585,60 @@
     <div id="trace-body"></div>
   </section>
 
+  <section id="variants">
+    <div class="sec-head"><span class="sec-num">03</span><h2>The four variants, and who lands on them</h2></div>
+    <p class="sec-sub">
+      Read from the <em>Page Variants</em> folder under the homepage item in Sitecore. The names are not
+      cosmetic &mdash; they are what <code>allowedVariants</code> has to contain, character for character,
+      and the bucket names are derived from them.
+    </p>
+    <div class="tablewrap" style="margin-bottom:22px">
+      <table>
+        <thead><tr><th>Sitecore item</th><th>Cache bucket</th><th>Who lands here</th><th>Signal the flow needs</th></tr></thead>
+        <tbody id="variant-rows"></tbody>
+      </table>
+    </div>
+    <div class="cards">
+      <div class="card crit">
+        <h4>Every variant requires a sign-in &mdash; which changes the maths</h4>
+        <p>
+          All four names begin <code>Logged-In-</code>. A signed-out visitor cannot match any of them, so
+          they land on <code>default</code>. Since most homepage traffic is signed out, <code>default</code>
+          is not an edge case or a control group &mdash; it is the busiest bucket on the site, and its cache
+          hit rate is what decides whether this project pays for itself.
+        </p>
+        <div class="where">4 items under /Page Variants</div>
+      </div>
+      <div class="card crit">
+        <h4>The browser-id call only ever fires for a visitor who gets <code>default</code></h4>
+        <p>
+          The <code>bid_</code> cookie is written on a visitor's very first request. <code>cclUser</code> is
+          written later, at sign-in. So anyone who could match a variant <em>already has a browser id</em> &mdash;
+          meaning <code>browser/create</code> only ever runs for a first-touch, signed-out visitor whose answer
+          is guaranteed to be <code>default</code>. Up to a second of added latency, plus a new CDP guest
+          record, spent on a question with a known answer.
+        </p>
+        <div class="where">main.js:106-109 &middot; confirm against the flow before acting</div>
+      </div>
+      <div class="card warn">
+        <h4>Why caching a signed-in page is safe here</h4>
+        <p>
+          The variant HTML is generic. Names, booking numbers and hold expiry are read from cookies in the
+          browser after hydration &mdash; <code>HeroBanner</code> and <code>CourtesyHoldHero</code> both do
+          their <code>parseCookie</code> work inside <code>useEffect</code>, so nothing personal reaches the
+          server render. Every component on all four variants has to keep that property, or one guest's data
+          gets cached and served to the whole bucket.
+        </p>
+        <div class="where">HeroBanner.tsx:48 &middot; CourtesyHoldHero.tsx:38</div>
+      </div>
+    </div>
+  </section>
+
   <section id="cache" class="deep-only">
-    <div class="sec-head"><span class="sec-num">03</span><h2>Why the cache doesn't collide</h2></div>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Why the cache doesn't collide</h2></div>
     <p class="sec-sub">
       The whole design rests on one line: the worker adds a Property Manager variable to Akamai's cache key.
-      Same URL, different bucket, different cached object.
+      Same URL, different bucket, different cached object &mdash; five of them.
     </p>
     <div class="keybox">
       <div class="keyline">
@@ -606,7 +658,7 @@
   </section>
 
   <section id="parity" class="deep-only">
-    <div class="sec-head"><span class="sec-num">04</span><h2>Does the edge send what the origin sends?</h2></div>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Does the edge send what the origin sends?</h2></div>
     <p class="sec-sub">
       The Personalize flows were built against the Next.js middleware. If the edge sends a different payload,
       the same visitor can get a different answer. This is the contract that has to hold.
@@ -620,7 +672,7 @@
   </section>
 
   <section id="blockers">
-    <div class="sec-head"><span class="sec-num">05</span><h2>What is not done yet</h2></div>
+    <div class="sec-head"><span class="sec-num">06</span><h2>What is not done yet</h2></div>
     <p class="sec-sub">
       Read from the repository as it stands today. These are the gaps between the code that exists and a
       working deployment.
@@ -629,7 +681,7 @@
   </section>
 
   <section id="property" class="deep-only">
-    <div class="sec-head"><span class="sec-num">06</span><h2>Property Manager, in order</h2></div>
+    <div class="sec-head"><span class="sec-num">07</span><h2>Property Manager, in order</h2></div>
     <p class="sec-sub">
       None of this lives in the repository. Four pieces of property configuration have to exist before the
       bundle does anything useful.
@@ -643,7 +695,7 @@
   </section>
 
   <section id="verify">
-    <div class="sec-head"><span class="sec-num">07</span><h2>Verification plan</h2></div>
+    <div class="sec-head"><span class="sec-num">08</span><h2>Verification plan</h2></div>
     <p class="sec-sub">
       Run these on Akamai staging with
       <code>Pragma: akamai-x-ew-debug, akamai-x-ew-debug-subs, akamai-x-get-cache-key</code>
@@ -654,13 +706,13 @@
   </section>
 
   <section id="risks" class="deep-only">
-    <div class="sec-head"><span class="sec-num">08</span><h2>Open questions worth a decision</h2></div>
+    <div class="sec-head"><span class="sec-num">09</span><h2>Open questions worth a decision</h2></div>
     <p class="sec-sub">Design choices that are defensible but should be made deliberately, not by default.</p>
     <div class="cards" id="risk-cards"></div>
   </section>
 
   <section id="glossary">
-    <div class="sec-head"><span class="sec-num">09</span><h2>Terms</h2></div>
+    <div class="sec-head"><span class="sec-num">10</span><h2>Terms</h2></div>
     <dl class="gloss" id="gloss-list"></dl>
   </section>
 
@@ -709,32 +761,32 @@
   ];
 
   var SCENARIOS = [
-    { id: 'cold', label: 'First visit, cache miss',
-      bucket: 'variant', subreq: '2', origin: 'Yes — one render', ceiling: '2500 ms',
-      note: 'The full path. Nothing is cached and the visitor has no browser id, so the worker mints one, calls the flow, rewrites the forward request and populates the bucket for everyone behind them.' },
-    { id: 'steady', label: 'Known visitor, cache hit',
-      bucket: 'variant', subreq: '1', origin: 'No', ceiling: '1500 ms',
-      note: 'The steady state and the case that matters most. The decision still runs on every request — that is what keeps CDP analytics honest — but the HTML comes straight out of the edge cache.' },
-    { id: 'newhit', label: 'First visit, cache hit',
-      bucket: 'variant', subreq: '2', origin: 'No', ceiling: '2500 ms',
-      note: 'A new visitor lands on a bucket someone else already warmed. They pay for the browser id and the flow call, but not for an origin render.' },
+    { id: 'cold', label: 'Signed-in guest, variant not cached',
+      bucket: 'logged-in-booked', subreq: '1', origin: 'Yes \u2014 one render', ceiling: '1500 ms',
+      note: 'The fullest path. The guest already has a browser id (it was written on their very first visit, long before they signed in), so only the flow call is needed \u2014 but this bucket has not been populated yet, so Akamai fetches it from the origin and stores it for everyone else who is booked.' },
+    { id: 'steady', label: 'Signed-in guest, cache hit',
+      bucket: 'logged-in-courtesy-hold', subreq: '1', origin: 'No', ceiling: '1500 ms',
+      note: 'The case that justifies the project. The decision still runs on every request \u2014 that is what keeps CDP analytics honest \u2014 but the HTML comes straight out of the edge cache. Personal details are filled in client-side from the <code>cclUser</code> and <code>cclCH</code> cookies after hydration.' },
+    { id: 'anon', label: 'Signed-out visitor',
+      bucket: 'default', subreq: '1\u20132', origin: 'No', ceiling: '2500 ms',
+      note: 'The majority of homepage traffic. Without a <code>cclUser</code> cookie none of the four variants can match, so the flow returns nothing and the visitor gets <code>default</code>. On a first-ever visit this path also pays for a <code>browser/create</code> call \u2014 to reach an answer that was never in doubt.' },
     { id: 'pv', label: 'Forced variant (?pv=)',
       bucket: 'forced', subreq: '0', origin: 'On first request per bucket', ceiling: 'none',
-      note: 'QA and content authors override the decision with <code>?pv=Variant A</code>. Personalize is never called. The value is still validated against the allow-list, so a typo lands on <code>default</code> instead of caching a 404.' },
+      note: 'QA and content authors override the decision with <code>?pv=Logged-In-Booked</code>. Personalize is never called. The value is still validated against the allow-list, so a typo lands on <code>default</code> instead of caching a 404.' },
     { id: 'prefetch', label: 'Prefetch',
       bucket: 'default', subreq: '0', origin: 'On first request', ceiling: 'none',
       note: 'Browser and Next.js router prefetches are detected and skipped, exactly like the origin middleware does today, so speculative loads do not inflate experiment metrics.' },
     { id: 'failopen', label: 'Personalize slow or down',
-      bucket: 'default', subreq: '1–2 (abandoned)', origin: 'On first request', ceiling: '2500 ms',
+      bucket: 'default', subreq: '1\u20132 (abandoned)', origin: 'On first request', ceiling: '2500 ms',
       note: 'Every failure mode collapses to the same outcome: serve the standard page under the <code>default</code> bucket. The worker never throws out of a handler and never blocks delivery.' },
     { id: 'bypass', label: 'Any other route',
       bucket: 'n/a', subreq: '0', origin: 'Normal delivery', ceiling: 'none',
-      note: 'Only paths listed in <code>CONFIG.ROUTES</code> are touched. Everything else — and every non-GET/HEAD request — passes through the worker untouched.' }
+      note: 'Only paths listed in <code>CONFIG.ROUTES</code> are touched. Everything else \u2014 and every non-GET/HEAD request \u2014 passes through the worker untouched.' }
   ];
 
-  var ALL = ['cold','steady','newhit','pv','prefetch','failopen','bypass'];
-  var PERSONALIZED = ['cold','steady','newhit','pv','prefetch','failopen'];
-  var FLOWCALL = ['cold','steady','newhit','failopen'];
+  var ALL = ['cold','steady','anon','pv','prefetch','failopen','bypass'];
+  var PERSONALIZED = ['cold','steady','anon','pv','prefetch','failopen'];
+  var FLOWCALL = ['cold','steady','anon','failopen'];
   var MISS = ['cold','pv'];
 
   var STEPS = [
@@ -764,7 +816,7 @@
       lane: 1, title: 'Is this a personalized route?', sub: 'GET/HEAD + matchRoute(host, path)',
       scn: ALL, tag: 'stop',
       what: 'An allow-list, not a deny-list. The method must be GET or HEAD and the normalized path must appear in <code>CONFIG.ROUTES[].paths</code>. Host filtering is optional and empty today, meaning any host on the property.',
-      wire: "ROUTES: [{\n  hosts: [],\n  paths: ['/'],\n  friendlyId: 'TODO_HOMEPAGE_FRIENDLY_ID',\n  allowedVariants: ['TODO Variant 1', … 'TODO Variant 5']\n}]",
+      wire: "ROUTES: [{\n  hosts: [],\n  paths: ['/'],\n  friendlyId: '<homepage experience friendly id>',\n  allowedVariants: [\n    'Logged-In-Booked',\n    'Logged-In-Courtesy-Hold',\n    'Logged-In-Non-Booked',\n    'Logged-In-Recently-Searched'\n  ]\n}]",
       code: 'akamai/edgeworker/main.js:69-74 · decision.js:64-73',
       fail: 'Only <code>/</code> is configured. Localized homepages such as <code>/en-au/</code> are <em>not</em> personalized at the edge and will keep using the origin middleware.'
     },
@@ -800,8 +852,8 @@
     },
     {
       lane: 1, title: 'Read the visitor context', sub: 'cookies, query string, bid_<clientKey>',
-      scn: ['cold','steady','newhit','pv','failopen'], deep: true,
-      what: 'The cookie jar is parsed into a plain map and the raw query string into key/value pairs, matching what <code>Object.fromEntries(new URLSearchParams(…))</code> produces in the middleware. The browser id lives in <code>bid_&lt;CLIENT_KEY&gt;</code>.',
+      scn: ['cold','steady','anon','pv','failopen'], deep: true,
+      what: 'The cookie jar is parsed into a plain map and the raw query string into key/value pairs, matching what <code>Object.fromEntries(new URLSearchParams(…))</code> produces in the middleware. The browser id lives in <code>bid_&lt;CLIENT_KEY&gt;</code> — and the variant-deciding signal lives in <code>cclUser</code>, <code>cclCH</code> and the recent-search cookies.',
       code: 'akamai/edgeworker/main.js:93-98 · decision.js:20-51',
       fail: 'A malformed <code>Cookie</code> header degrades to an empty jar rather than throwing — the request just looks like a new visitor.'
     },
@@ -814,41 +866,50 @@
     },
     {
       lane: 1, title: 'No browser id — ask CDP for one', sub: 'sub-request 1 · timeout 1000 ms', to: 2,
-      scn: ['cold','newhit','failopen'], tag: 'net',
+      scn: ['anon','failopen'], tag: 'net',
       what: 'A GET to the Engage browser-create endpoint through the property\'s <code>/__engage</code> pass-through rule. Reproduces <code>getBrowserIdFromCdp()</code> in <code>@sitecore/engage</code>.',
       wire: "GET /__engage/v1.2/browser/create.json\n      ?client_key=<CLIENT_KEY>&message=%7B%7D\nX-Library-Version: 1.4.3\n\n→ 200 { \"ref\": \"<browser id>\" }",
       code: 'akamai/edgeworker/engage-client.js:26-46',
+      why: 'A visitor without a <code>bid_</code> cookie has never been here before, and a visitor who has never been here has not signed in — so they carry no <code>cclUser</code> cookie and cannot match any of the four variants. This call therefore only ever runs for someone whose answer is already known to be <code>default</code>. Gating it on the presence of <code>cclUser</code> would remove up to a second from the first-visit path and stop minting a CDP guest record for every bot that crawls the homepage. Confirm with the flow owner first: if <em>Logged-In-Recently-Searched</em> can fire from CDP history rather than a cookie, the argument weakens for that one variant.',
       fail: 'Non-200, timeout or a missing <code>ref</code> returns <code>undefined</code>, is logged, and the request is served on the <code>default</code> bucket. EdgeWorkers sub-requests can only reach Akamaized hosts, which is why this goes through a relative <code>/__engage</code> path rather than straight to <code>api-engage-us.sitecorecloud.io</code>.'
     },
     {
       lane: 2, title: 'CDP issues a guest identity', sub: 'returns ref — the new browser id',
-      scn: ['cold','newhit'],
+      scn: ['anon'],
       what: 'Sitecore CDP creates a guest record and returns its reference. This value becomes the <code>bid_&lt;clientKey&gt;</code> cookie and ties every later event — server-side or client-side — to the same guest.',
       why: 'Consistency of this id is what makes an A/B experiment meaningful: the same visitor must land in the same bucket across requests and sessions.'
     },
     {
       lane: 1, title: 'Resolve market and build flow inputs', sub: 'point of sale, currency, language, params',
       scn: FLOWCALL, deep: true,
-      what: 'The first path segment picks the locale; on <code>en-AU</code> the <code>SelectedCurrency</code> cookie (AUD or NZD) overrides point of sale and currency. The flattened <code>params</code> object carries referrer, UTM values, every query parameter and every cookie.',
+      what: 'The first path segment picks the locale; on <code>en-AU</code> the <code>SelectedCurrency</code> cookie (AUD or NZD) overrides point of sale and currency. The flattened <code>params</code> object carries referrer, UTM values, every query parameter and every cookie — and for this homepage, the cookies <em>are</em> the decision.',
       wire: "referrer:      <referer header> | 'about:client'\nutm_campaign / utm_content / utm_medium / utm_source\nqs_<name>:     every query parameter\ncookies_<name>: every cookie (≤1 KB each, ≤8 KB total)",
       code: 'akamai/edgeworker/decision.js:80-135 · getPersonalizeContext.ts:106-157',
-      fail: 'The cookie budget is an edge-only guard. The origin middleware forwards every cookie uncapped, so a flow rule that reads an unusually large cookie could behave differently at the edge. Worth confirming against the live flow definitions.'
+      fail: 'The cookie budget is an edge-only guard, and on this page it is a real hazard. <code>cclCH</code> is a JSON blob of roughly twenty fields — ship name, itinerary name, port names, a token, several dates — and once URL-encoded it can plausibly exceed the 1024-byte per-value cap, at which point the edge <em>silently skips it</em> and <em>Logged-In-Courtesy-Hold</em> can never be selected. The 8192-byte total is spent in cookie-header order with a <code>break</code>, so on a request carrying many analytics cookies, <code>cclUser</code> or <code>cclCH</code> can be dropped simply for arriving late. Neither case logs anything. Measure the real encoded sizes before go-live.'
     },
     {
       lane: 1, title: 'Ask the flow for a variant', sub: 'sub-request 2 · timeout 1500 ms', to: 2,
       scn: FLOWCALL, tag: 'net',
       what: 'A POST whose body is byte-compatible with what <code>@sitecore/engage</code> sends from the origin today — same endpoint, same field names, same flattening.',
-      wire: "POST /__engage/v2/callFlows\nContent-Type: application/json\nX-Library-Version: 1.4.3\n\n{\n  \"channel\":      \"WEB\",\n  \"clientKey\":    \"<CLIENT_KEY>\",\n  \"currencyCode\": \"USD\",\n  \"friendlyId\":   \"<homepage experience id>\",\n  \"language\":     \"en\",\n  \"pointOfSale\":  \"carnivalUS\",\n  \"browserId\":    \"<bid>\",\n  \"params\":       { referrer, utm_*, qs_*, cookies_* }\n}",
+      wire: "POST /__engage/v2/callFlows\nContent-Type: application/json\nX-Library-Version: 1.4.3\n\n{\n  \"channel\":      \"WEB\",\n  \"clientKey\":    \"<CLIENT_KEY>\",\n  \"currencyCode\": \"USD\",\n  \"friendlyId\":   \"<homepage experience id>\",\n  \"language\":     \"en\",\n  \"pointOfSale\":  \"carnivalUS\",\n  \"browserId\":    \"<bid>\",\n  \"params\": {\n    \"referrer\":        \"about:client\",\n    \"cookies_cclUser\": \"{FirstName,PastGuestNumber,TierCode\u2026}\",\n    \"cookies_cclCH\":   \"{BookingNumber,ShipName,Expiration\u2026}\",\n    \"qs_*\": \"\u2026\", \"utm_*\": \"\u2026\"\n  }\n}",
       code: 'akamai/edgeworker/engage-client.js:55-74 · main.js:117-126',
       why: 'This call runs on cache hits too. It is the reason CDP still records an experience execution for every visitor even though the HTML was never regenerated.'
     },
     {
-      lane: 2, title: 'The flow assigns a bucket', sub: 'one of five variants, or nothing',
-      scn: ['cold','steady','newhit'],
-      what: 'The decision model runs and returns the winning variant. The worker reads it from any of the shapes the flow can produce: <code>variantIds</code> as an array or an object, a bare <code>variantId</code>, decision-model output nodes, or the <code>pageVariantId</code> fallback.',
-      wire: "{ \"variantIds\": [\"Variant A\"] }                  → Variant A\n{ \"variantIds\": { \"page\": \"Variant A\" } }        → Variant A\n{ \"pageVariantId\": \"Variant A\" }                 → Variant A\n{ \"results\": { \"decisionModelResultNodes\": [ … ] } }",
+      lane: 2, title: 'The flow assigns a bucket', sub: 'one of four signed-in variants',
+      scn: ['cold','steady'],
+      what: 'The decision model reads the guest context — principally the <code>cclUser</code> and booking cookies forwarded as <code>params</code> — and returns the winning variant. The worker accepts any of the shapes the flow can produce: <code>variantIds</code> as an array or an object, a bare <code>variantId</code>, decision-model output nodes, or the <code>pageVariantId</code> fallback.',
+      wire: "{ \"variantIds\": [\"Logged-In-Booked\"] }\n{ \"variantIds\": { \"page\": \"Logged-In-Courtesy-Hold\" } }\n{ \"pageVariantId\": \"Logged-In-Non-Booked\" }\n{ \"results\": { \"decisionModelResultNodes\": [ … ] } }",
       code: 'akamai/edgeworker/decision.js:143-171',
-      why: 'A visitor the flow deliberately leaves unassigned is not an error — they are the control group, and they share the <code>default</code> bucket with everyone else who was not personalized.'
+      why: 'These are states, not an experiment split. Nobody is randomly assigned — the bucket follows the guest\'s actual booking status, so it changes when their circumstances change. That is why the same visitor legitimately moves between buckets across visits.'
+    },
+    {
+      lane: 2, title: 'No variant returned — the control path', sub: 'signed-out visitors end here',
+      scn: ['anon'], tag: 'warn',
+      what: 'With no <code>cclUser</code> cookie in <code>params</code>, none of the four signed-in variants can match. The flow returns nothing the worker recognizes, <code>extractVariantId()</code> yields an empty string, and the bucket stays <code>default</code>.',
+      wire: "extractVariantId(result) → ''\n\nbucket stays 'default' · no request.route() call\nno x-ew-pz-gtm header · no sc_personalize_gtm cookie",
+      code: 'akamai/edgeworker/decision.js:143-171 · main.js:130-140',
+      why: 'This is the busiest path on the site, and it is indistinguishable from a failure at the edge — both produce <code>default</code>. Monitoring has to separate the two, or a broken flow will look exactly like normal signed-out traffic.'
     },
     {
       lane: 1, title: 'Timeout, error, or no answer', sub: 'fail open to the default bucket',
@@ -860,39 +921,39 @@
     },
     {
       lane: 1, title: 'Validate against the allow-list', sub: 'allowedVariants, normalized',
-      scn: ['cold','steady','newhit','pv'], tag: 'warn',
-      what: 'Names are normalized — spaces to dashes, lowercased — and compared against <code>CONFIG.ROUTES[].allowedVariants</code>. Anything unrecognized falls back to <code>default</code>.',
-      wire: "'Variant A' → 'variant-a'\n\nallowedVariants: []   // empty = trust the flow (not recommended)",
+      scn: ['cold','steady','pv'], tag: 'warn',
+      what: 'Names are normalized — spaces to dashes, lowercased — and compared against <code>CONFIG.ROUTES[].allowedVariants</code>. Anything unrecognized falls back to <code>default</code>. These four names contain no spaces, so normalization is just a lowercase.',
+      wire: "'Logged-In-Booked'            → 'logged-in-booked'\n'Logged-In-Courtesy-Hold'     → 'logged-in-courtesy-hold'\n'Logged-In-Non-Booked'        → 'logged-in-non-booked'\n'Logged-In-Recently-Searched' → 'logged-in-recently-searched'\n\nallowedVariants: []   // empty = trust the flow (not recommended)",
       code: 'akamai/edgeworker/main.js:130-138 · decision.js:174-176',
       why: 'This replaces the middleware\'s runtime check against <code>activePageVariants</code> from Experience Edge. The edge cannot afford that GraphQL round trip, so the list is baked into the bundle instead.',
       fail: 'The trade-off is a redeploy whenever Sitecore variants are added or renamed. Skipping the check would let a stale flow route to a nonexistent page — and Akamai would then cache that 404 for the entire bucket.'
     },
     {
       lane: 1, title: 'Rewrite the forward path and set the bucket', sub: 'the only place the variant URL exists',
-      scn: ['cold','steady','newhit','pv'], tag: 'good',
+      scn: ['cold','steady','pv'], tag: 'good',
       what: 'Three things happen together: the cache-key variable becomes the variant, the origin-bound path becomes the variant item\'s path, and the GTM payload is stashed on an internal header for the response handler.',
-      wire: "request.setVariable('PMUSER_EW_BUCKET', 'variant-a')\n\nrequest.route({ path: '/Page%20Variants/Variant%20A' })\n\nx-ew-pz-gtm: <urlencoded>\n  { \"browserId\": \"…\",\n    \"experiences\": [{ \"friendlyId\": \"…\",\n                      \"variantId\": \"Variant A\",\n                      \"type\": \"page\" }] }",
+      wire: "request.setVariable('PMUSER_EW_BUCKET', 'logged-in-booked')\n\nrequest.route({ path: '/Page%20Variants/Logged-In-Booked' })\n\nx-ew-pz-gtm: <urlencoded>\n  { \"browserId\": \"…\",\n    \"experiences\": [{ \"friendlyId\": \"…\",\n                      \"variantId\": \"Logged-In-Booked\",\n                      \"type\": \"page\" }] }",
       code: 'akamai/edgeworker/main.js:140-160',
       why: 'Identical in shape to the middleware\'s <code>basePath = `${basePath}/Page Variants/${pageVariantId}`</code> rewrite, so the origin resolves the same Sitecore item. The client-facing URL is never touched.',
-      fail: 'The edge percent-encodes the segment (<code>Page%20Variants</code>) where the Next.js rewrite passes a literal space. Confirm the origin route resolves both spellings.'
+      fail: 'Only the folder name needs encoding — the variant names are already hyphenated, so <code>encodeURIComponent</code> leaves them untouched. The edge still percent-encodes <code>Page%20Variants</code> where the Next.js rewrite passes a literal space; confirm the origin route resolves both spellings.'
     },
     {
       lane: 1, title: 'Cache lookup', sub: 'key = URL + PMUSER_EW_BUCKET',
       scn: PERSONALIZED,
-      what: 'Only now does Akamai look for a cached object — with the bucket already folded into the key. Six possible entries for one URL: five variants plus <code>default</code>.',
+      what: 'Only now does Akamai look for a cached object — with the bucket already folded into the key. Five possible entries for one URL: four signed-in variants plus <code>default</code>.',
       why: 'Because the decision ran first, the lookup is exact. There is no "cache then personalize" window where the wrong visitor sees the wrong variant.'
     },
     {
       lane: 1, title: 'HIT — serve from the edge', sub: 'the origin is never contacted', tag: 'good',
-      scn: ['steady','newhit','prefetch','failopen'],
-      what: 'The cached HTML for that bucket is returned. Zero origin load, zero SSR, zero Layout Service calls, zero Experience Edge queries.',
+      scn: ['steady','anon','prefetch','failopen'],
+      what: 'The cached HTML for that bucket is returned. Zero origin load, zero SSR, zero Layout Service calls, zero Experience Edge queries. Personal details are painted in afterwards, in the browser, from cookies.',
       why: 'This is the point of the whole exercise. Today the homepage cannot be cached at all, because the personalization decision lives inside the response. Moving the decision in front of the cache turns a per-request render into a per-bucket render.'
     },
     {
       lane: 1, title: 'MISS — go to origin', sub: 'forward the rewritten request', to: 3, tag: 'net',
       scn: MISS,
       what: 'Akamai forwards the request to the origin using the rewritten path and the <code>x-edge-personalize</code> header, plus the internal state headers.',
-      wire: "GET /Page%20Variants/Variant%20A HTTP/1.1\nHost: <origin hostname>\nx-edge-personalize: 1\nx-ew-pz-bucket: variant-a\nx-ew-pz-bid: <browser id>      (new visitors only)\nx-ew-pz-bid-new: 1             (new visitors only)",
+      wire: "GET /Page%20Variants/Logged-In-Booked HTTP/1.1\nHost: <origin hostname>\nx-edge-personalize: 1\nx-ew-pz-bucket: logged-in-booked\nx-ew-pz-bid: <browser id>      (new visitors only)\nx-ew-pz-bid-new: 1             (new visitors only)",
       code: 'akamai/edgeworker/main.js:152, 162-166',
       fail: 'The <code>x-ew-pz-*</code> headers reach the origin as well. They are harmless today, but they carry a per-visitor browser id into a request whose response will be shared with a whole bucket — worth confirming the origin never echoes them into the HTML.'
     },
@@ -915,7 +976,7 @@
     {
       lane: 3, title: 'Render the variant route', sub: 'ISR via getStaticProps, revalidate 5s',
       scn: MISS,
-      what: 'The catch-all page resolves the Sitecore item at <code>/Page Variants/Variant A</code>, fetches layout data and renders. Static generation is incremental with <code>fallback: \'blocking\'</code> and a five-second revalidation window.',
+      what: 'The catch-all page resolves the Sitecore item at <code>/Page Variants/Logged-In-Booked</code>, fetches layout data and renders. Static generation is incremental with <code>fallback: \'blocking\'</code> and a five-second revalidation window. The render must stay free of guest-specific values — <code>HeroBanner</code> and <code>CourtesyHoldHero</code> defer their cookie reads to <code>useEffect</code> precisely so this output can be shared.',
       code: 'src/pages/[[...path]].tsx:86-100',
       why: 'Two caches now sit in series: Next.js ISR at the origin and Akamai at the edge. The edge TTL should be the longer of the two and is what actually governs how often the origin is touched.'
     },
@@ -938,27 +999,45 @@
       lane: 0, title: 'Response reaches the visitor', sub: '200 · URL is still /', to: 0, tag: 'good',
       scn: ALL,
       what: 'The visitor receives the variant\'s HTML at the canonical URL. With <code>x-ew-pz-debug: 1</code> on the request, the response also carries <code>x-ew-pz-bucket</code> naming the chosen bucket.',
-      wire: 'x-ew-pz-bucket: variant-a   (only when x-ew-pz-debug is sent)',
+      wire: 'x-ew-pz-bucket: logged-in-booked   (only when x-ew-pz-debug is sent)',
       code: 'akamai/edgeworker/main.js:211-213',
       why: 'The debug header is the fastest way to verify a decision in staging without reading DataStream logs.'
     },
     {
       lane: 0, title: 'Browser forwards the decision to analytics', sub: 'PersonalizeGtmSync → dataLayer + Tealium',
-      scn: ['cold','steady','newhit','pv','failopen'],
+      scn: ['cold','steady','pv','failopen'],
       what: 'A mount-time effect reads <code>sc_personalize_gtm</code>, decodes it (up to three <code>decodeURIComponent</code> passes), pushes a <code>sitecore_personalize</code> event to the GTM dataLayer, waits up to five seconds for <code>utag</code> to load, sends the same payload to Tealium and then clears the cookie.',
-      wire: "window.dataLayer.push({\n  event: 'sitecore_personalize',\n  bid: <browserId>,\n  vifp: <cclUser.PastGuestNumber>,\n  experiences: [{ friendlyId, variantId, type: 'page' }]\n})",
+      wire: "window.dataLayer.push({\n  event: 'sitecore_personalize',\n  bid: <browserId>,\n  vifp: <cclUser.PastGuestNumber>,\n  experiences: [{ friendlyId, variantId: 'Logged-In-Booked', type: 'page' }]\n})",
       code: 'src/components/PersonalizeGtmSync/PersonalizeGtmSync.tsx:49-127',
       why: 'This component is unchanged. The EdgeWorker writes exactly the cookie it already expected from the middleware, which is why analytics required no work on the origin side.'
     }
+  ];
+
+  var VARIANTS = [
+    ['Logged-In-Booked', 'logged-in-booked',
+     'Signed-in guest with a confirmed booking',
+     '<code>cclUser</code> plus booking state'],
+    ['Logged-In-Courtesy-Hold', 'logged-in-courtesy-hold',
+     'Signed-in guest holding a cabin that has not been paid for',
+     '<code>cclUser</code> plus <code>cclCH</code> \u2014 booking number, ship, itinerary, expiry'],
+    ['Logged-In-Non-Booked', 'logged-in-non-booked',
+     'Signed-in guest with nothing booked or held',
+     '<code>cclUser</code> present, no booking or hold cookie'],
+    ['Logged-In-Recently-Searched', 'logged-in-recently-searched',
+     'Signed-in guest who has searched recently',
+     '<code>cclUser</code> plus recent-search state \u2014 cookie or CDP history? <strong>confirm</strong>'],
+    ['\u2014 no variant \u2014', 'default',
+     'Everyone signed out, plus prefetches, timeouts and unknown variants',
+     'no <code>cclUser</code> cookie']
   ];
 
   var PARITY = [
     ['Browser id endpoint', '<code>@sitecore/engage</code> <code>getBrowserIdFromCdp()</code>', '<code>GET /v1.2/browser/create.json</code>, same query shape', 'ok', 'Match'],
     ['Decision endpoint', '<code>engageServer.personalize()</code> → <code>POST /v2/callFlows</code>', 'Hand-rolled <code>POST /v2/callFlows</code>, same body fields', 'ok', 'Match'],
     ['Experience params', 'referrer + nested <code>utm</code>/<code>qs</code>/<code>cookies</code>, flattened with <code>_</code> by the SDK', 'Pre-flattened <code>referrer</code>, <code>utm_*</code>, <code>qs_*</code>, <code>cookies_*</code>', 'ok', 'Match'],
-    ['Cookie payload size', 'Every cookie, uncapped', '≤1 KB per value, ≤8 KB total', 'warn', 'Confirm'],
-    ['Variant allow-list', '<code>activePageVariants</code> from Experience Edge, per request', '<code>allowedVariants</code> baked into <code>config.js</code>', 'warn', 'Redeploy needed'],
-    ['Rewrite target', '<code>${basePath}/Page Variants/${variantId}</code>', '<code>${basePath}/Page%20Variants/${variantId}</code>', 'warn', 'Confirm encoding'],
+    ['Cookie payload size', 'Every cookie, uncapped', '≤1 KB per value, ≤8 KB total, order-dependent', 'crit', 'Blocks a variant'],
+    ['Variant allow-list', '<code>activePageVariants</code> from Experience Edge, per request', 'Four names baked into <code>config.js</code>', 'warn', 'Redeploy needed'],
+    ['Rewrite target', '<code>/Page Variants/Logged-In-Booked</code>', '<code>/Page%20Variants/Logged-In-Booked</code>', 'warn', 'Confirm encoding'],
     ['Test override', '<code>?pv=</code> returns the raw value', '<code>?pv=</code>, then validated against the allow-list', 'ok', 'Edge is stricter'],
     ['Component variants', '<code>?dv=</code> plus per-component flow calls', 'Not implemented — by design', 'ok', 'Out of scope'],
     ['Decision timeout', '10 000 ms in <code>getVariantByPageId()</code>', '1000 ms + 1500 ms', 'warn', 'Edge abandons sooner'],
@@ -969,24 +1048,24 @@
   ];
 
   var BLOCKERS = [
+    { sev: 'crit', h: 'The cookie cap can silently disable a whole variant',
+      p: 'The edge skips any cookie whose value exceeds 1024 bytes and stops adding cookies once 8192 bytes are spent \u2014 in cookie-header order, with a <code>break</code>. <code>cclCH</code> is a twenty-field JSON blob (ship, itinerary, ports, token, dates) that can plausibly exceed the per-value cap once URL-encoded, and on a request carrying many analytics cookies even <code>cclUser</code> can be dropped for arriving late. Either case means the flow never sees the signal and <em>Logged-In-Courtesy-Hold</em> can never fire at the edge, while it works fine at the origin today. Nothing is logged. Measure the real encoded sizes before go-live.',
+      w: 'akamai/edgeworker/decision.js:125-132 \u00b7 config.js:128-129' },
     { sev: 'crit', h: 'The origin does not skip personalization',
       p: 'The middleware plugin still disables only on the environment flag. It does not look at <code>x-edge-personalize</code>, so on a cache miss the origin runs the full personalize chain a second time and layers per-user component variants into markup Akamai is about to share.',
       w: 'src/lib/middleware/plugins/engage.ts:49' },
-    { sev: 'crit', h: 'config.js is still a template',
-      p: '<code>CLIENT_KEY</code>, <code>friendlyId</code> and all five variant names are <code>TODO_</code> placeholders. The bundle will register and activate, and then quietly serve every visitor the default bucket.',
+    { sev: 'crit', h: 'config.js still lists five placeholder variants',
+      p: 'It should carry exactly four, spelled as the Sitecore items are: <code>Logged-In-Booked</code>, <code>Logged-In-Courtesy-Hold</code>, <code>Logged-In-Non-Booked</code>, <code>Logged-In-Recently-Searched</code>. <code>CLIENT_KEY</code> and <code>friendlyId</code> are also still <code>TODO_</code> placeholders \u2014 the bundle will activate cleanly and then serve every visitor the default bucket.',
       w: 'akamai/edgeworker/config.js:15, 55, 58-64' },
     { sev: 'warn', h: 'Cookie domain is unset',
-      p: '<code>COOKIE_DOMAIN: \'\'</code> makes the browser id host-only, where the origin scopes it with <code>NEXT_PUBLIC_ENGAGE_COOKIE_DOMAIN</code>. Mismatched scopes split one guest into two.',
+      p: '<code>COOKIE_DOMAIN: \'\'</code> makes the browser id host-only, where the origin scopes it with <code>NEXT_PUBLIC_ENGAGE_COOKIE_DOMAIN</code>. Mismatched scopes split one guest into two, which would look exactly like personalization quietly not working.',
       w: 'akamai/edgeworker/config.js:104' },
     { sev: 'warn', h: 'Only the US homepage is in scope',
       p: '<code>ROUTES[0].paths</code> is <code>[\'/\']</code>. The AU and NZ homepages keep going through the origin middleware, which means two personalization paths run side by side.',
       w: 'akamai/edgeworker/config.js:47' },
     { sev: 'info', h: 'None of the property config is in the repo',
       p: 'The variable declaration, the <code>/__engage</code> pass-through, the caching rules and the EdgeWorkers behaviour all live in Property Manager. Nothing in this repository can prove they exist.',
-      w: 'Akamai property configuration' },
-    { sev: 'info', h: 'No automated tests cover the worker',
-      p: 'There are no unit tests for <code>decision.js</code> — the variant extraction, param flattening and market resolution are the parts most likely to drift from the middleware, and they are pure functions that would be cheap to test.',
-      w: 'akamai/edgeworker/' }
+      w: 'Akamai property configuration' }
   ];
 
   var PM_ROWS = [
@@ -999,7 +1078,11 @@
   var CHECKS = [
     ['<code>PMUSER_EW_BUCKET</code> is declared in the property', 'Deploy, then request the homepage. If the bucket never changes from <code>default</code>, check DataStream for <code>pz: onClientRequest failed</code> — an undeclared variable is the usual cause.'],
     ['The cache key contains the bucket', 'Send <code>Pragma: akamai-x-get-cache-key</code> and confirm the returned key includes the variable.'],
-    ['Two buckets produce two cached objects', 'Request <code>?pv=Variant%20A</code> and <code>?pv=Variant%20B</code>, then compare the HTML at the plain <code>/</code> URL for each bucket. Different bodies, same URL.'],
+    ['Two buckets produce two cached objects', 'Request <code>?pv=Logged-In-Booked</code> and <code>?pv=Logged-In-Non-Booked</code>, then compare the HTML for each bucket. Different bodies, same URL.'],
+    ['<code>cclCH</code> survives the 1 KB cookie cap', 'Capture a real courtesy-hold cookie, URL-encode it and measure the byte length. Over 1024 and the edge drops it silently, so <em>Logged-In-Courtesy-Hold</em> can never be selected.'],
+    ['<code>cclUser</code> reaches the flow on a cookie-heavy request', 'Replay a request carrying the full production cookie set and confirm <code>cookies_cclUser</code> is present in the callFlows body \u2014 the 8 KB budget is spent in header order and drops whatever arrives late.'],
+    ['All four variants can actually be selected', 'Drive one request per variant with real cookie state and confirm each returns its own bucket rather than <code>default</code>.'],
+    ['No variant renders guest data during SSR', 'Fetch each variant path directly from the origin with no cookies and grep the HTML for names, booking numbers and hold expiry. Anything found would be cached and shared.'],
     ['<code>/__engage/*</code> forwards correctly', 'Curl <code>/__engage/v1.2/browser/create.json?client_key=…&amp;message=%7B%7D</code> directly through the property and expect a <code>ref</code>.'],
     ['POST is allowed on the Engage rule', 'Watch <code>akamai-x-ew-debug-subs</code> for the <code>callFlows</code> sub-request. A 405 here means the rule still rejects POST.'],
     ['Both sub-requests appear on a first visit, one on the second', 'Cookieless request, then repeat with the returned <code>bid_</code> cookie.'],
@@ -1015,23 +1098,26 @@
     ['CDP records an execution on cache hits', 'Hit a warm bucket repeatedly and confirm the experience execution count rises in Personalize.'],
     ['Prefetches do not call the flow', 'Send <code>next-router-prefetch: 1</code> and confirm no <code>callFlows</code> sub-request in the debug output.'],
     ['Personalize going down does not take the page down', 'Block <code>/__engage/*</code> at the property, then confirm the homepage still serves under the <code>default</code> bucket.'],
-    ['<code>allowedVariants</code> matches Sitecore exactly', 'Compare against the item names under the homepage\'s <em>Page Variants</em> folder, including capitalization and spacing.'],
+    ['<code>allowedVariants</code> matches Sitecore exactly', 'Four entries: <code>Logged-In-Booked</code>, <code>Logged-In-Courtesy-Hold</code>, <code>Logged-In-Non-Booked</code>, <code>Logged-In-Recently-Searched</code> \u2014 capitalization and hyphens included.'],
+    ['Signed-out traffic is separable from failure in logs', 'Both produce <code>default</code>. Confirm DataStream lets you tell &ldquo;flow returned nothing&rdquo; apart from &ldquo;flow errored&rdquo;.'],
     ['Bot traffic is accounted for', 'Every cookieless request creates a CDP guest. Decide whether Bot Manager gates the worker\'s routes before this goes to production.']
   ];
 
   var RISKS = [
+    { sev: 'warn', h: 'Every component on every variant must stay SSR-clean',
+      p: 'Per-bucket caching is only safe because guest data is read from cookies after hydration. <code>HeroBanner</code> and <code>CourtesyHoldHero</code> both do their <code>parseCookie</code> work inside <code>useEffect</code>, so the server render is generic. If any component on any of the four variants ever renders a name, booking number or hold expiry during SSR, that value is cached and served to everyone in the bucket. This needs to be an explicit review rule, not an accident of the current code.' },
+    { sev: 'warn', h: '<code>default</code> is the bucket that has to perform',
+      p: 'All four variants require a sign-in, so signed-out traffic \u2014 the majority \u2014 lands on <code>default</code>. The business case rests almost entirely on that one bucket\'s hit rate, not on the personalized four.' },
+    { sev: 'warn', h: 'A broken flow is indistinguishable from normal traffic',
+      p: 'Signed-out visitors and total CDP failure both produce <code>default</code>. Without splitting those two in DataStream, a flow that stops returning variants looks exactly like a quiet day.' },
     { sev: 'warn', h: 'Every cookieless request creates a CDP guest',
-      p: 'Crawlers, uptime monitors and scrapers all arrive without a <code>bid_</code> cookie, so each one mints a guest record. The README suggests gating the routes behind Bot Manager or short-circuiting known bots to the default bucket before the worker runs.' },
-    { sev: 'warn', h: 'Variant changes require a bundle redeploy',
-      p: 'Moving the allow-list from Experience Edge into <code>config.js</code> buys a round trip but couples content changes to an EdgeWorker release. Whoever owns Sitecore content needs to know that adding a variant is now a deployment.' },
-    { sev: 'warn', h: 'Two caches in series',
-      p: 'Next.js ISR revalidates every 5 seconds while the edge TTL is measured in minutes to an hour. Content freshness is governed by the edge TTL and by purges — the ISR window becomes largely decorative for these routes.' },
-    { sev: 'info', h: 'Component personalization stays at the origin',
-      p: 'Per-component variants would multiply the cache-key space and defeat the point. Pages served through this worker get page-variant bucketing only, so any component-level experiment on the homepage must be re-thought or moved to a page variant.' },
-    { sev: 'info', h: 'The decision cost is paid on every request',
-      p: 'A cache hit still costs one <code>callFlows</code> round trip from the edge. That is a deliberate trade for analytics accuracy — the alternative, caching the decision, would under-count experience executions.' },
-    { sev: 'info', h: 'Failures are silent by design',
-      p: 'Every failure path serves a correct page and logs to <code>logger.error</code>. That is right for availability, but it means monitoring has to come from DataStream 2 — nothing user-visible signals that personalization stopped working.' }
+      p: 'Crawlers and monitors arrive without a <code>bid_</code> cookie, so each one mints a guest record \u2014 and, since they are signed out, can only ever be told <code>default</code>. Gating the mint on <code>cclUser</code>, or putting Bot Manager in front of the worker, removes most of this.' },
+    { sev: 'info', h: 'Variant changes require a bundle redeploy',
+      p: 'Moving the allow-list from Experience Edge into <code>config.js</code> buys a round trip but couples content changes to an EdgeWorker release. Adding a fifth variant in Sitecore now means a deployment.' },
+    { sev: 'info', h: 'Two caches in series',
+      p: 'Next.js ISR revalidates every 5 seconds while the edge TTL is measured in minutes to an hour. Freshness is governed by the edge TTL and by purges \u2014 the ISR window becomes largely decorative for these routes.' },
+    { sev: 'info', h: 'These are states, not an experiment',
+      p: 'Because the buckets follow booking status rather than a random split, a guest legitimately moves between them as their circumstances change. Nothing in the design pins a visitor, so this is not an A/B test and should not be reported as one.' }
   ];
 
   var GLOSSARY = [
@@ -1043,7 +1129,9 @@
     ['Browser id (bid)', 'The anonymous identifier that keeps a visitor in the same bucket across visits.'],
     ['Fail open', 'When something goes wrong, show the standard page rather than an error. Personalization is an enhancement, never a dependency.'],
     ['Origin', 'Our Next.js application, running in Kubernetes. Everything Akamai cannot answer itself comes from here.'],
-    ['ISR', 'Incremental Static Regeneration — the origin caches its own rendered pages and refreshes them on a timer.']
+    ['ISR', 'Incremental Static Regeneration — the origin caches its own rendered pages and refreshes them on a timer.'],
+    ['Courtesy hold', 'A cabin a guest is holding without having paid for it. It expires, which is why that variant carries a countdown.'],
+    ['cclUser cookie', 'Written when someone signs in. Its presence is what makes any of the four variants possible at all.']
   ];
 
   /* ------------------------------------------------------------------ state */
@@ -1254,16 +1342,27 @@
   function renderBuckets() {
     var host = document.getElementById('buckets');
     host.innerHTML = '';
-    ['Variant A', 'Variant B', 'Variant C', 'Variant D', 'Variant E'].forEach(function (v) {
-      var b = el('div', 'bucket');
-      b.innerHTML = '<div class="bn">' + v.replace(' ', '-').toLowerCase() + '</div>' +
-        '<div class="bu">forwards to <code>/Page%20Variants/' + v.replace(' ', '%20') + '</code></div>';
+    VARIANTS.forEach(function (v) {
+      var isDefault = v[1] === 'default';
+      var b = el('div', 'bucket' + (isDefault ? ' def' : ''));
+      b.innerHTML = '<div class="bn">' + v[1] + '</div><div class="bu">' +
+        (isDefault
+          ? 'no rewrite \u2014 every signed-out visitor, plus prefetches, timeouts and unknown variants'
+          : 'forwards to <code>/Page%20Variants/' + v[0] + '</code>') +
+        '</div>';
       host.appendChild(b);
     });
-    var d = el('div', 'bucket def');
-    d.innerHTML = '<div class="bn">default</div>' +
-      '<div class="bu">no rewrite — control group, prefetches, timeouts, unknown variants and every failure path</div>';
-    host.appendChild(d);
+  }
+
+  function renderVariants() {
+    var tb = document.getElementById('variant-rows');
+    if (!tb) return;
+    tb.innerHTML = VARIANTS.map(function (v) {
+      var isDefault = v[1] === 'default';
+      return '<tr><td><strong>' + (isDefault ? '<em>' + v[0] + '</em>' : v[0]) +
+        '</strong></td><td><span class="mono">' + v[1] + '</span></td><td>' + v[2] +
+        '</td><td>' + v[3] + '</td></tr>';
+    }).join('');
   }
 
   function renderParity() {
@@ -1409,6 +1508,7 @@
   renderScenarioUI();
   renderTrace();
   renderBuckets();
+  renderVariants();
   renderParity();
   renderCards('blocker-cards', BLOCKERS);
   renderCards('risk-cards', RISKS);

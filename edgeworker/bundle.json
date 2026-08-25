@@ -1,0 +1,4 @@
+{
+  "edgeworker-version": "1.0.0",
+  "description": "Sitecore Personalize page-variant bucketing for ccl-home. Assigns the visitor to a Personalize bucket before cache lookup, rewrites the origin request to the bucket's unique URL and varies the Akamai cache key by bucket."
+}
