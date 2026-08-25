@@ -1,0 +1,1423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Homepage Edge Trace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --ink: #0f1622;
+    --ink-2: #3d4b60;
+    --ink-3: #6f7e94;
+    --bg: #eaeef4;
+    --surface: #ffffff;
+    --surface-2: #f4f7fb;
+    --surface-3: #e7ecf4;
+    --line: #d3dbe7;
+    --line-strong: #b4c0d1;
+    --accent: #c74f0c;
+    --accent-ink: #8f3906;
+    --accent-soft: #fbeade;
+    --lane-0: #56668090;
+    --lane-1: #c74f0c;
+    --lane-2: #a2185b;
+    --lane-3: #2a5fc4;
+    --lane-0s: #566680;
+    --ok: #0f7050;
+    --ok-soft: #e2f3ec;
+    --warn: #8d5a05;
+    --warn-soft: #fbf0da;
+    --crit: #ad2318;
+    --crit-soft: #fbe6e3;
+    --shadow: 0 1px 2px rgba(15,22,34,.06), 0 8px 24px -12px rgba(15,22,34,.18);
+    --radius: 10px;
+    --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7edf6;
+      --ink-2: #a9b7cb;
+      --ink-3: #7d8ca3;
+      --bg: #0c1119;
+      --surface: #141b26;
+      --surface-2: #1a2331;
+      --surface-3: #222d3d;
+      --line: #27323f;
+      --line-strong: #3b4a5e;
+      --accent: #ff8f52;
+      --accent-ink: #ffb287;
+      --accent-soft: #2c1a11;
+      --lane-0: #93a4bd90;
+      --lane-1: #ff8f52;
+      --lane-2: #f472a8;
+      --lane-3: #7ba4ff;
+      --lane-0s: #93a4bd;
+      --ok: #45c496;
+      --ok-soft: #10281f;
+      --warn: #e2a83f;
+      --warn-soft: #2a2110;
+      --crit: #ff7468;
+      --crit-soft: #2d1512;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #e7edf6;
+    --ink-2: #a9b7cb;
+    --ink-3: #7d8ca3;
+    --bg: #0c1119;
+    --surface: #141b26;
+    --surface-2: #1a2331;
+    --surface-3: #222d3d;
+    --line: #27323f;
+    --line-strong: #3b4a5e;
+    --accent: #ff8f52;
+    --accent-ink: #ffb287;
+    --accent-soft: #2c1a11;
+    --lane-0: #93a4bd90;
+    --lane-1: #ff8f52;
+    --lane-2: #f472a8;
+    --lane-3: #7ba4ff;
+    --lane-0s: #93a4bd;
+    --ok: #45c496;
+    --ok-soft: #10281f;
+    --warn: #e2a83f;
+    --warn-soft: #2a2110;
+    --crit: #ff7468;
+    --crit-soft: #2d1512;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.15;
+  }
+
+  a { color: var(--accent-ink); }
+
+  code, kbd, .mono { font-family: var(--mono); font-size: 0.86em; }
+
+  :where(a, button, input, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .narrow { max-width: 720px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 60;
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-in {
+    display: flex; align-items: center; gap: 20px;
+    padding: 10px 24px; max-width: 1180px; margin: 0 auto;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand b {
+    font-family: var(--display); font-weight: 800; font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .brand span {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: .09em;
+  }
+
+  .segmented {
+    display: inline-flex; background: var(--surface-3);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px;
+  }
+  .segmented button {
+    font: 500 13px/1 var(--body); color: var(--ink-2);
+    background: none; border: 0; cursor: pointer;
+    padding: 7px 15px; border-radius: 999px;
+  }
+  .segmented button[aria-pressed="true"] {
+    background: var(--surface); color: var(--ink);
+    box-shadow: 0 1px 2px rgba(15,22,34,.14);
+    font-weight: 600;
+  }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 60px 0 40px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent-ink); font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(34px, 5.4vw, 60px); font-weight: 800;
+    letter-spacing: -0.032em; max-width: 15ch;
+  }
+  .hero .lede {
+    margin-top: 20px; max-width: 62ch; font-size: 18px;
+    color: var(--ink-2); line-height: 1.62;
+  }
+  .hero .lede strong { color: var(--ink); font-weight: 600; }
+
+  .facts {
+    display: grid; gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin-top: 40px; overflow: hidden;
+  }
+  .fact { background: var(--surface); padding: 16px 18px; }
+  .fact .v {
+    font-family: var(--display); font-weight: 700; font-size: 27px;
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  }
+  .fact .k {
+    font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.4;
+  }
+
+  /* ---------- generic section ---------- */
+  section { padding: 46px 0; border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .sec-head h2 { font-size: clamp(23px, 2.6vw, 30px); }
+  .sec-num {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+    letter-spacing: .1em;
+  }
+  .sec-sub { color: var(--ink-2); max-width: 68ch; margin: 10px 0 28px; }
+
+  /* ---------- plain-english ---------- */
+  .plain {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 26px 28px;
+    display: grid; gap: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  .plain .step-n {
+    font-family: var(--mono); font-size: 11px; color: var(--accent-ink);
+    letter-spacing: .12em; font-weight: 600;
+  }
+  .plain h4 { font-size: 16px; margin: 6px 0 6px; }
+  .plain p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+
+  /* ---------- scenario picker ---------- */
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .scn {
+    font: 500 13px/1 var(--body); cursor: pointer;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 9px 15px; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .scn:hover { border-color: var(--line-strong); }
+  .scn[aria-pressed="true"] {
+    background: var(--accent); border-color: var(--accent);
+    color: var(--surface); font-weight: 600;
+  }
+  .scn .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .55; }
+
+  .scn-readout {
+    display: grid; gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    overflow: hidden; margin-bottom: 26px;
+  }
+  .scn-readout > div { background: var(--surface); padding: 13px 16px; }
+  .scn-readout .k {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .scn-readout .v { font-size: 15px; font-weight: 600; margin-top: 3px; }
+  .scn-note {
+    grid-column: 1 / -1; font-size: 14.5px; color: var(--ink-2);
+    background: var(--surface-2) !important;
+  }
+
+  /* ---------- trace ---------- */
+  .lanes {
+    position: sticky; top: 53px; z-index: 40;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    padding: 10px 0; background: var(--bg);
+    border-bottom: 1px solid var(--line); margin-bottom: 4px;
+  }
+  .lane-h {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; font-weight: 600;
+    padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--surface); display: flex; align-items: center; gap: 8px;
+  }
+  .lane-h i { width: 8px; height: 8px; border-radius: 2px; display: block; }
+  .lane-h span { color: var(--ink-3); font-weight: 400; letter-spacing: .04em; text-transform: none; font-size: 10.5px; }
+
+  #trace { position: relative; padding-bottom: 8px; }
+  .trow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .conn { height: 30px; position: relative; }
+  .conn svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .conn .head {
+    position: absolute; bottom: -1px; width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid var(--line-strong); transform: translateX(-5px);
+  }
+
+  .node {
+    text-align: left; width: 100%; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--lanec, var(--line-strong));
+    border-radius: 8px; padding: 11px 13px 12px;
+    font-family: var(--body); color: var(--ink);
+    display: flex; flex-direction: column; gap: 3px;
+    box-shadow: 0 1px 1px rgba(15,22,34,.04);
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  }
+  .node:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--line-strong); }
+  .node .n {
+    font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+    letter-spacing: .07em; display: flex; align-items: center; gap: 7px;
+  }
+  .node .t { font-weight: 600; font-size: 14.5px; line-height: 1.3; letter-spacing: -0.005em; }
+  .node .s { font-size: 12.5px; color: var(--ink-2); line-height: 1.42; }
+  .node .tag {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
+    background: var(--surface-3); color: var(--ink-3); font-weight: 600;
+  }
+  .node .tag.net { background: var(--accent-soft); color: var(--accent-ink); }
+  .node .tag.stop { background: var(--crit-soft); color: var(--crit); }
+  .node .tag.good { background: var(--ok-soft); color: var(--ok); }
+  .node .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .node.has-note { border-color: var(--accent); }
+  .node.has-note::after {
+    content: 'note'; position: absolute; top: -8px; right: 8px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .08em;
+    background: var(--accent); color: var(--surface);
+    padding: 1px 6px; border-radius: 999px; text-transform: uppercase;
+  }
+  .node { position: relative; }
+
+  .lane-chip { display: none; }
+
+  /* ---------- drawer ---------- */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(10,14,22,.42);
+    z-index: 80; opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%);
+    background: var(--surface); border-left: 1px solid var(--line);
+    z-index: 90; transform: translateX(100%); transition: transform .22s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: none; }
+  .drawer-head {
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--line);
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .drawer-head h3 { font-size: 20px; }
+  .drawer-head .meta {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px;
+  }
+  .x {
+    margin-left: auto; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--ink-2); border-radius: 7px; width: 30px; height: 30px;
+    cursor: pointer; font-size: 17px; line-height: 1; flex: none;
+  }
+  .drawer-body { overflow-y: auto; padding: 20px 24px 32px; flex: 1; }
+  .dfield { margin-bottom: 22px; }
+  .dfield > h5 {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 7px;
+    font-weight: 600;
+  }
+  .dfield p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .dfield p + p { margin-top: 9px; }
+
+  pre.wire {
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 13px 14px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12px; line-height: 1.6;
+    color: var(--ink); margin: 0; white-space: pre;
+  }
+  .srcref {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; display: block; margin-bottom: 5px;
+  }
+  .fail {
+    border-left: 3px solid var(--warn); background: var(--warn-soft);
+    padding: 11px 14px; border-radius: 0 7px 7px 0; font-size: 14px; color: var(--ink);
+  }
+  .note-box { display: flex; flex-direction: column; gap: 9px; }
+  .note-box textarea {
+    width: 100%; min-height: 76px; resize: vertical;
+    font: 400 14px/1.5 var(--body); color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .btn {
+    font: 600 13px/1 var(--body); cursor: pointer;
+    background: var(--accent); color: var(--surface);
+    border: 0; border-radius: 7px; padding: 10px 16px;
+  }
+  .btn.ghost {
+    background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line);
+    font-weight: 500;
+  }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* ---------- cache buckets ---------- */
+  .keybox {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px 24px; margin-bottom: 22px;
+  }
+  .keyline {
+    font-family: var(--mono); font-size: 13.5px; display: flex;
+    flex-wrap: wrap; align-items: center; gap: 8px; line-height: 2;
+  }
+  .kpart {
+    padding: 4px 9px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--surface-2);
+  }
+  .kpart.hi { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .buckets { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); }
+  .bucket {
+    border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+    background: var(--surface);
+  }
+  .bucket .bn { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+  .bucket .bu { font-size: 12px; color: var(--ink-3); margin-top: 5px; word-break: break-word; }
+  .bucket.def { border-style: dashed; border-color: var(--line-strong); background: var(--surface-2); }
+
+  /* ---------- tables ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 660px; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+    background: var(--surface-2); position: sticky; top: 0;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td .mono { color: var(--ink-2); }
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; font-weight: 600;
+    text-transform: uppercase;
+  }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.crit { background: var(--crit-soft); color: var(--crit); }
+
+  /* ---------- blockers ---------- */
+  .cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .card.crit { border-left: 3px solid var(--crit); }
+  .card.warn { border-left: 3px solid var(--warn); }
+  .card.info { border-left: 3px solid var(--lane-3); }
+  .card h4 { font-size: 15.5px; }
+  .card p { margin: 0; font-size: 14px; color: var(--ink-2); }
+  .card .where {
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+    margin-top: auto; padding-top: 6px;
+  }
+
+  /* ---------- checklist ---------- */
+  .checks { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .check {
+    background: var(--surface); padding: 13px 16px; display: grid;
+    grid-template-columns: 22px 1fr; gap: 12px; align-items: start;
+  }
+  .check input { margin: 4px 0 0; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .check .ct { font-size: 14.5px; font-weight: 500; }
+  .check .cd { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
+  .check .cd code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
+  .check.done .ct { color: var(--ink-3); text-decoration: line-through; }
+  .progress {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+  }
+  .bar { flex: 1; height: 5px; background: var(--surface-3); border-radius: 999px; overflow: hidden; max-width: 300px; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s ease; }
+
+  /* ---------- glossary ---------- */
+  .gloss { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .gloss dt { font-family: var(--display); font-weight: 700; font-size: 15px; }
+  .gloss dd { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); }
+
+  /* ---------- prompt bar ---------- */
+  .promptbar {
+    position: sticky; bottom: 0; z-index: 50;
+    background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+  }
+  .promptbar-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 14px; align-items: center; }
+  .promptbar .summary { flex: 1; font-size: 13px; color: var(--ink-2); min-width: 0; }
+  .promptbar .summary b { color: var(--ink); }
+  .prompt-out {
+    max-height: 190px; overflow-y: auto; font-family: var(--mono);
+    font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 14px; margin: 0 24px 14px;
+    max-width: 1132px; color: var(--ink-2);
+  }
+  @media (min-width: 1181px) { .prompt-out { margin-left: auto; margin-right: auto; } }
+
+  footer { padding: 34px 0 60px; color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--line); }
+
+  .deep-only { display: none; }
+  body[data-mode="deep"] .deep-only { display: revert; }
+  body[data-mode="deep"] .trow.deep-only { display: grid; }
+  body[data-mode="deep"] .cards.deep-only { display: grid; }
+  body[data-mode="deep"] .plain.deep-only { display: grid; }
+  body[data-mode="brief"] .brief-hide { display: none; }
+
+  @media (max-width: 880px) {
+    .lanes { display: none; }
+    .trow { grid-template-columns: 1fr !important; }
+    .trow > .node { grid-column: 1 !important; }
+    .conn { height: 14px; }
+    .conn svg, .conn .head { display: none; }
+    .lane-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--ink-3);
+    }
+    .lane-chip i { width: 7px; height: 7px; border-radius: 2px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <b>Homepage Edge Trace</b>
+      <span>carnival.com &middot; ccl-home</span>
+    </div>
+    <div class="segmented" role="group" aria-label="Detail level">
+      <button id="m-brief" aria-pressed="false">Overview</button>
+      <button id="m-deep" aria-pressed="true">Engineering</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap hero">
+  <div class="eyebrow">Sitecore Personalize EdgeWorker &middot; architecture &amp; verification</div>
+  <h1>One URL, six cached homepages, zero origin hits.</h1>
+  <p class="lede">
+    Today every personalized homepage request runs the decision inside the Next.js middleware at the
+    origin, so <strong>the page can never be cached</strong>. This EdgeWorker moves the Sitecore Personalize
+    decision to the Akamai edge, <em>before</em> cache lookup. Akamai asks Personalize which variant
+    the visitor belongs to, then serves that variant's already-cached HTML. The visitor's address bar
+    still says <code>/</code>; only Akamai's cache key and the forward request know about the variant.
+  </p>
+
+  <div class="facts">
+    <div class="fact"><div class="v">5 + 1</div><div class="k">page variants plus a <code>default</code> bucket — six cache entries for one URL</div></div>
+    <div class="fact"><div class="v">2</div><div class="k">sub-requests on a first visit, 1 for a returning visitor, 0 with <code>?pv=</code></div></div>
+    <div class="fact"><div class="v">2.5s</div><div class="k">worst-case configured timeout ceiling before the worker fails open</div></div>
+    <div class="fact"><div class="v">Every</div><div class="k">personalized request still executes the flow &mdash; cache hits included, so CDP analytics stay accurate</div></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <section id="plain">
+    <div class="sec-head"><span class="sec-num">01</span><h2>The short version</h2></div>
+    <p class="sec-sub">Six things happen. Everything else on this page is a zoom-in on one of them.</p>
+    <div class="plain">
+      <div><div class="step-n">A</div><h4>The request reaches Akamai</h4><p>A visitor asks for the homepage. It lands on the nearest Akamai edge server, not on our servers.</p></div>
+      <div><div class="step-n">B</div><h4>Akamai identifies the visitor</h4><p>It looks for a Sitecore Personalize browser id in a cookie. If there isn't one, it asks Personalize to mint a new one.</p></div>
+      <div><div class="step-n">C</div><h4>Personalize picks a variant</h4><p>Akamai calls the Personalize flow with the visitor's context. The flow answers with one of five homepage variants — or nothing, which means "show the standard page".</p></div>
+      <div><div class="step-n">D</div><h4>Akamai checks its cache for that variant</h4><p>Each variant has its own cached copy of the homepage. If Akamai already holds one, it is returned immediately and our origin is never touched.</p></div>
+      <div><div class="step-n">E</div><h4>Only on a miss: the origin renders</h4><p>Akamai fetches that one variant from the Next.js app running in Kubernetes, then stores it for everyone else in the same bucket.</p></div>
+      <div><div class="step-n">F</div><h4>The visitor gets the page, analytics get the decision</h4><p>Cookies carry the browser id and the decision back to the browser, which forwards it to GTM and Tealium. The URL never changed.</p></div>
+    </div>
+  </section>
+
+  <section id="trace">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Follow one request</h2></div>
+    <p class="sec-sub">
+      Pick a scenario to trace it end to end. Each box is one real step in the code — click any of them for
+      the exact wire detail, the source line it comes from, and what happens when it fails.
+    </p>
+
+    <div class="scenarios" id="scn-list" role="group" aria-label="Scenario"></div>
+    <div class="scn-readout" id="scn-readout"></div>
+
+    <div class="lanes" id="lanes"></div>
+    <div id="trace-body"></div>
+  </section>
+
+  <section id="cache" class="deep-only">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Why the cache doesn't collide</h2></div>
+    <p class="sec-sub">
+      The whole design rests on one line: the worker adds a Property Manager variable to Akamai's cache key.
+      Same URL, different bucket, different cached object.
+    </p>
+    <div class="keybox">
+      <div class="keyline">
+        <span class="kpart">https://www.carnival.com</span>
+        <span class="kpart">/</span>
+        <span class="kpart">(query params, minus <code>utm_*</code>)</span>
+        <span style="color:var(--ink-3)">+</span>
+        <span class="kpart hi">PMUSER_EW_BUCKET</span>
+      </div>
+      <p style="font-size:14px;color:var(--ink-2);margin:14px 0 0">
+        <code>request.cacheKey.includeVariable('PMUSER_EW_BUCKET')</code> runs on <em>every</em> request to a
+        configured route — hits and misses alike — so the key space stays consistent. The variable must be
+        declared in Property Manager first; <code>setVariable()</code> throws if it isn't.
+      </p>
+    </div>
+    <div class="buckets" id="buckets"></div>
+  </section>
+
+  <section id="parity" class="deep-only">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Does the edge send what the origin sends?</h2></div>
+    <p class="sec-sub">
+      The Personalize flows were built against the Next.js middleware. If the edge sends a different payload,
+      the same visitor can get a different answer. This is the contract that has to hold.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Contract point</th><th>Next.js middleware (today)</th><th>EdgeWorker</th><th>Status</th></tr></thead>
+        <tbody id="parity-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="blockers">
+    <div class="sec-head"><span class="sec-num">05</span><h2>What is not done yet</h2></div>
+    <p class="sec-sub">
+      Read from the repository as it stands today. These are the gaps between the code that exists and a
+      working deployment.
+    </p>
+    <div class="cards" id="blocker-cards"></div>
+  </section>
+
+  <section id="property" class="deep-only">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Property Manager, in order</h2></div>
+    <p class="sec-sub">
+      None of this lives in the repository. Four pieces of property configuration have to exist before the
+      bundle does anything useful.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Rule</th><th>Setting</th><th>Why it matters</th></tr></thead>
+        <tbody id="pm-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="verify">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Verification plan</h2></div>
+    <p class="sec-sub">
+      Run these on Akamai staging with
+      <code>Pragma: akamai-x-ew-debug, akamai-x-ew-debug-subs, akamai-x-get-cache-key</code>
+      and the worker's own <code>x-ew-pz-debug: 1</code>. Ticks are remembered in this browser only.
+    </p>
+    <div class="progress"><span id="prog-label">0 / 0 verified</span><span class="bar"><i id="prog-bar"></i></span></div>
+    <div class="checks" id="check-list"></div>
+  </section>
+
+  <section id="risks" class="deep-only">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Open questions worth a decision</h2></div>
+    <p class="sec-sub">Design choices that are defensible but should be made deliberately, not by default.</p>
+    <div class="cards" id="risk-cards"></div>
+  </section>
+
+  <section id="glossary">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Terms</h2></div>
+    <dl class="gloss" id="gloss-list"></dl>
+  </section>
+
+  <footer>
+    Generated from <code>akamai/edgeworker/*</code>, <code>src/lib/engage/**</code> and
+    <code>charts/ccl-home/**</code> on the <code>master</code> branch. Timeout values and cache
+    behaviour shown here are the <em>configured</em> ceilings in <code>config.js</code>, not measured
+    production latency.
+  </footer>
+</div>
+
+<pre class="prompt-out deep-only" id="prompt-out"></pre>
+<div class="promptbar deep-only">
+  <div class="promptbar-in">
+    <div class="summary" id="prompt-summary"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="clear-notes">Clear notes</button>
+      <button class="btn" id="copy-prompt">Copy prompt</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Step detail">
+  <div class="drawer-head">
+    <div>
+      <div class="meta" id="d-meta"></div>
+      <h3 id="d-title"></h3>
+    </div>
+    <button class="x" id="d-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="drawer-body" id="d-body"></div>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ data */
+
+  var LANES = [
+    { id: 0, name: 'Visitor', sub: 'browser', color: 'var(--lane-0s)' },
+    { id: 1, name: 'Akamai edge', sub: 'EdgeWorker + property', color: 'var(--lane-1)' },
+    { id: 2, name: 'Sitecore Personalize', sub: 'CDP / Engage API', color: 'var(--lane-2)' },
+    { id: 3, name: 'Origin', sub: 'Next.js JSS on K8s', color: 'var(--lane-3)' }
+  ];
+
+  var SCENARIOS = [
+    { id: 'cold', label: 'First visit, cache miss',
+      bucket: 'variant', subreq: '2', origin: 'Yes — one render', ceiling: '2500 ms',
+      note: 'The full path. Nothing is cached and the visitor has no browser id, so the worker mints one, calls the flow, rewrites the forward request and populates the bucket for everyone behind them.' },
+    { id: 'steady', label: 'Known visitor, cache hit',
+      bucket: 'variant', subreq: '1', origin: 'No', ceiling: '1500 ms',
+      note: 'The steady state and the case that matters most. The decision still runs on every request — that is what keeps CDP analytics honest — but the HTML comes straight out of the edge cache.' },
+    { id: 'newhit', label: 'First visit, cache hit',
+      bucket: 'variant', subreq: '2', origin: 'No', ceiling: '2500 ms',
+      note: 'A new visitor lands on a bucket someone else already warmed. They pay for the browser id and the flow call, but not for an origin render.' },
+    { id: 'pv', label: 'Forced variant (?pv=)',
+      bucket: 'forced', subreq: '0', origin: 'On first request per bucket', ceiling: 'none',
+      note: 'QA and content authors override the decision with <code>?pv=Variant A</code>. Personalize is never called. The value is still validated against the allow-list, so a typo lands on <code>default</code> instead of caching a 404.' },
+    { id: 'prefetch', label: 'Prefetch',
+      bucket: 'default', subreq: '0', origin: 'On first request', ceiling: 'none',
+      note: 'Browser and Next.js router prefetches are detected and skipped, exactly like the origin middleware does today, so speculative loads do not inflate experiment metrics.' },
+    { id: 'failopen', label: 'Personalize slow or down',
+      bucket: 'default', subreq: '1–2 (abandoned)', origin: 'On first request', ceiling: '2500 ms',
+      note: 'Every failure mode collapses to the same outcome: serve the standard page under the <code>default</code> bucket. The worker never throws out of a handler and never blocks delivery.' },
+    { id: 'bypass', label: 'Any other route',
+      bucket: 'n/a', subreq: '0', origin: 'Normal delivery', ceiling: 'none',
+      note: 'Only paths listed in <code>CONFIG.ROUTES</code> are touched. Everything else — and every non-GET/HEAD request — passes through the worker untouched.' }
+  ];
+
+  var ALL = ['cold','steady','newhit','pv','prefetch','failopen','bypass'];
+  var PERSONALIZED = ['cold','steady','newhit','pv','prefetch','failopen'];
+  var FLOWCALL = ['cold','steady','newhit','failopen'];
+  var MISS = ['cold','pv'];
+
+  var STEPS = [
+    {
+      lane: 0, title: 'Visitor requests the homepage', sub: 'GET https://www.carnival.com/',
+      scn: ALL, tag: 'net',
+      what: 'An ordinary browser request. No personalization query string, no special header. The address bar shows <code>/</code> and it will still show <code>/</code> when the response comes back.',
+      wire: 'GET / HTTP/2\nHost: www.carnival.com\nCookie: bid_<clientKey>=…   (returning visitors only)\n        SelectedCurrency=AUD    (AU site only)',
+      why: 'Nothing about this request tells the visitor, a bot, or a scraper that personalization is happening. That is deliberate — the URL stays canonical and SEO-clean.'
+    },
+    {
+      lane: 1, title: 'Edge server accepts the request', sub: 'TLS terminated at the nearest PoP',
+      scn: ALL,
+      what: 'Akamai matches the delivery property rules for this hostname and path. If the path is in scope for the EdgeWorkers behaviour, the bundle is loaded and <code>onClientRequest</code> is invoked.',
+      why: '<code>onClientRequest</code> runs <em>before</em> cache lookup. That single fact is what makes this whole design possible: the worker can change the cache key before Akamai decides which object to serve.',
+      code: 'akamai/edgeworker/main.js:60 — export async function onClientRequest(request)'
+    },
+    {
+      lane: 1, title: 'Discard spoofable inbound state', sub: 'remove x-ew-pz-* from the client request',
+      scn: ALL, deep: true, tag: 'warn',
+      what: 'The worker passes per-request state from <code>onClientRequest</code> to <code>onClientResponse</code> using internal request headers. A client could send those headers itself, so they are stripped first, before anything else runs.',
+      wire: 'request.removeHeader("x-ew-pz-bid")\nrequest.removeHeader("x-ew-pz-bid-new")\nrequest.removeHeader("x-ew-pz-gtm")\nrequest.removeHeader("x-ew-pz-bucket")',
+      code: 'akamai/edgeworker/main.js:63-66',
+      why: 'Without this, a crafted request could inject an arbitrary browser id or GTM payload into the response cookies of its own session.'
+    },
+    {
+      lane: 1, title: 'Is this a personalized route?', sub: 'GET/HEAD + matchRoute(host, path)',
+      scn: ALL, tag: 'stop',
+      what: 'An allow-list, not a deny-list. The method must be GET or HEAD and the normalized path must appear in <code>CONFIG.ROUTES[].paths</code>. Host filtering is optional and empty today, meaning any host on the property.',
+      wire: "ROUTES: [{\n  hosts: [],\n  paths: ['/'],\n  friendlyId: 'TODO_HOMEPAGE_FRIENDLY_ID',\n  allowedVariants: ['TODO Variant 1', … 'TODO Variant 5']\n}]",
+      code: 'akamai/edgeworker/main.js:69-74 · decision.js:64-73',
+      fail: 'Only <code>/</code> is configured. Localized homepages such as <code>/en-au/</code> are <em>not</em> personalized at the edge and will keep using the origin middleware.'
+    },
+    {
+      lane: 1, title: 'Not configured — pass straight through', sub: 'worker returns, normal delivery',
+      scn: ['bypass'], tag: 'good',
+      what: 'The handler returns immediately. No cache key change, no headers set, no sub-requests. Akamai delivers the request exactly as it would with no EdgeWorker attached.',
+      why: 'Scoping the EdgeWorkers behaviour in Property Manager to the personalized paths as well is still recommended — it avoids spending worker execution on traffic that will always no-op.'
+    },
+    {
+      lane: 1, title: 'Claim a cache bucket', sub: "bucket = 'default' and join it to the cache key",
+      scn: PERSONALIZED,
+      what: 'Every request on a personalized route gets the bucket dimension immediately, starting at <code>default</code>. If a variant is chosen later the variable is overwritten; if anything fails, <code>default</code> is what stands.',
+      wire: "request.setVariable('PMUSER_EW_BUCKET', 'default')\nrequest.cacheKey.includeVariable('PMUSER_EW_BUCKET')",
+      code: 'akamai/edgeworker/main.js:78-80',
+      fail: '<code>setVariable()</code> throws if <code>PMUSER_EW_BUCKET</code> is not declared as a user-defined variable in Property Manager. The <code>try/catch</code> around the handler swallows it and the request is served unpersonalized — silently. This is the single most likely cause of "the worker deployed but nothing happens".'
+    },
+    {
+      lane: 1, title: 'Tell the origin the edge owns personalization', sub: 'x-edge-personalize: 1 on the forward request',
+      scn: PERSONALIZED, deep: true,
+      what: 'Set unconditionally on personalized routes — including requests that will end up on the <code>default</code> bucket — before any decision is made.',
+      code: 'akamai/edgeworker/main.js:85',
+      why: 'If the origin also personalized the request, per-user markup would be baked into an object that is then shared with the whole bucket. The header is the contract that prevents that.',
+      fail: 'The origin does not honour this header yet. <code>src/lib/middleware/plugins/engage.ts:49</code> still reads <code>disabled: () =&gt; process.env.NEXT_PUBLIC_ENABLE_PERSONALIZATION === \'false\'</code>. Until the header check is added, a cache miss runs the full origin middleware chain a second time.'
+    },
+    {
+      lane: 1, title: 'Prefetch? Stop here.', sub: 'purpose / sec-purpose / next-router-prefetch',
+      scn: ['prefetch'], tag: 'stop',
+      what: 'Speculative loads are served the <code>default</code> bucket without calling Personalize, mirroring <code>isPrefetch()</code> in the origin middleware.',
+      wire: "purpose: prefetch\nsec-purpose: …prefetch…\nnext-router-prefetch: 1\nx-moz: prefetch",
+      code: 'akamai/edgeworker/main.js:51-58, 87-91',
+      why: 'Executing an experience for a page the visitor may never see would count as an impression and skew A/B metrics.'
+    },
+    {
+      lane: 1, title: 'Read the visitor context', sub: 'cookies, query string, bid_<clientKey>',
+      scn: ['cold','steady','newhit','pv','failopen'], deep: true,
+      what: 'The cookie jar is parsed into a plain map and the raw query string into key/value pairs, matching what <code>Object.fromEntries(new URLSearchParams(…))</code> produces in the middleware. The browser id lives in <code>bid_&lt;CLIENT_KEY&gt;</code>.',
+      code: 'akamai/edgeworker/main.js:93-98 · decision.js:20-51',
+      fail: 'A malformed <code>Cookie</code> header degrades to an empty jar rather than throwing — the request just looks like a new visitor.'
+    },
+    {
+      lane: 1, title: 'Test override wins', sub: '?pv=Variant%20A short-circuits Personalize',
+      scn: ['pv'], tag: 'good',
+      what: 'When <code>?pv=</code> carries a non-empty value it is taken as the variant and no CDP call is made at all — the same test mode <code>getVariantByPageId()</code> implements at the origin.',
+      code: 'akamai/edgeworker/main.js:101-104 · getVariantByPageId.ts:68-70',
+      why: 'Because the bucket is part of the cache key, a forced variant populates and reads its own cache entry. QA does not pollute what real visitors see.'
+    },
+    {
+      lane: 1, title: 'No browser id — ask CDP for one', sub: 'sub-request 1 · timeout 1000 ms', to: 2,
+      scn: ['cold','newhit','failopen'], tag: 'net',
+      what: 'A GET to the Engage browser-create endpoint through the property\'s <code>/__engage</code> pass-through rule. Reproduces <code>getBrowserIdFromCdp()</code> in <code>@sitecore/engage</code>.',
+      wire: "GET /__engage/v1.2/browser/create.json\n      ?client_key=<CLIENT_KEY>&message=%7B%7D\nX-Library-Version: 1.4.3\n\n→ 200 { \"ref\": \"<browser id>\" }",
+      code: 'akamai/edgeworker/engage-client.js:26-46',
+      fail: 'Non-200, timeout or a missing <code>ref</code> returns <code>undefined</code>, is logged, and the request is served on the <code>default</code> bucket. EdgeWorkers sub-requests can only reach Akamaized hosts, which is why this goes through a relative <code>/__engage</code> path rather than straight to <code>api-engage-us.sitecorecloud.io</code>.'
+    },
+    {
+      lane: 2, title: 'CDP issues a guest identity', sub: 'returns ref — the new browser id',
+      scn: ['cold','newhit'],
+      what: 'Sitecore CDP creates a guest record and returns its reference. This value becomes the <code>bid_&lt;clientKey&gt;</code> cookie and ties every later event — server-side or client-side — to the same guest.',
+      why: 'Consistency of this id is what makes an A/B experiment meaningful: the same visitor must land in the same bucket across requests and sessions.'
+    },
+    {
+      lane: 1, title: 'Resolve market and build flow inputs', sub: 'point of sale, currency, language, params',
+      scn: FLOWCALL, deep: true,
+      what: 'The first path segment picks the locale; on <code>en-AU</code> the <code>SelectedCurrency</code> cookie (AUD or NZD) overrides point of sale and currency. The flattened <code>params</code> object carries referrer, UTM values, every query parameter and every cookie.',
+      wire: "referrer:      <referer header> | 'about:client'\nutm_campaign / utm_content / utm_medium / utm_source\nqs_<name>:     every query parameter\ncookies_<name>: every cookie (≤1 KB each, ≤8 KB total)",
+      code: 'akamai/edgeworker/decision.js:80-135 · getPersonalizeContext.ts:106-157',
+      fail: 'The cookie budget is an edge-only guard. The origin middleware forwards every cookie uncapped, so a flow rule that reads an unusually large cookie could behave differently at the edge. Worth confirming against the live flow definitions.'
+    },
+    {
+      lane: 1, title: 'Ask the flow for a variant', sub: 'sub-request 2 · timeout 1500 ms', to: 2,
+      scn: FLOWCALL, tag: 'net',
+      what: 'A POST whose body is byte-compatible with what <code>@sitecore/engage</code> sends from the origin today — same endpoint, same field names, same flattening.',
+      wire: "POST /__engage/v2/callFlows\nContent-Type: application/json\nX-Library-Version: 1.4.3\n\n{\n  \"channel\":      \"WEB\",\n  \"clientKey\":    \"<CLIENT_KEY>\",\n  \"currencyCode\": \"USD\",\n  \"friendlyId\":   \"<homepage experience id>\",\n  \"language\":     \"en\",\n  \"pointOfSale\":  \"carnivalUS\",\n  \"browserId\":    \"<bid>\",\n  \"params\":       { referrer, utm_*, qs_*, cookies_* }\n}",
+      code: 'akamai/edgeworker/engage-client.js:55-74 · main.js:117-126',
+      why: 'This call runs on cache hits too. It is the reason CDP still records an experience execution for every visitor even though the HTML was never regenerated.'
+    },
+    {
+      lane: 2, title: 'The flow assigns a bucket', sub: 'one of five variants, or nothing',
+      scn: ['cold','steady','newhit'],
+      what: 'The decision model runs and returns the winning variant. The worker reads it from any of the shapes the flow can produce: <code>variantIds</code> as an array or an object, a bare <code>variantId</code>, decision-model output nodes, or the <code>pageVariantId</code> fallback.',
+      wire: "{ \"variantIds\": [\"Variant A\"] }                  → Variant A\n{ \"variantIds\": { \"page\": \"Variant A\" } }        → Variant A\n{ \"pageVariantId\": \"Variant A\" }                 → Variant A\n{ \"results\": { \"decisionModelResultNodes\": [ … ] } }",
+      code: 'akamai/edgeworker/decision.js:143-171',
+      why: 'A visitor the flow deliberately leaves unassigned is not an error — they are the control group, and they share the <code>default</code> bucket with everyone else who was not personalized.'
+    },
+    {
+      lane: 1, title: 'Timeout, error, or no answer', sub: 'fail open to the default bucket',
+      scn: ['failopen'], tag: 'stop',
+      what: 'Any non-200, any timeout, any exception anywhere in the handler ends the same way: the variable stays <code>default</code>, the forward path is not rewritten, and the standard homepage is served.',
+      wire: "logger.error('pz: callFlows returned ' + status)\nlogger.error('pz: callFlows failed: ' + message)\nlogger.error('pz: onClientRequest failed: ' + message)",
+      code: 'akamai/edgeworker/main.js:167-174 · engage-client.js:42-45, 71-74',
+      why: 'Personalization is an enhancement, never a dependency. If Sitecore Personalize is unavailable, carnival.com still serves its homepage from cache — which is arguably better than today, where the origin middleware is in the critical path.'
+    },
+    {
+      lane: 1, title: 'Validate against the allow-list', sub: 'allowedVariants, normalized',
+      scn: ['cold','steady','newhit','pv'], tag: 'warn',
+      what: 'Names are normalized — spaces to dashes, lowercased — and compared against <code>CONFIG.ROUTES[].allowedVariants</code>. Anything unrecognized falls back to <code>default</code>.',
+      wire: "'Variant A' → 'variant-a'\n\nallowedVariants: []   // empty = trust the flow (not recommended)",
+      code: 'akamai/edgeworker/main.js:130-138 · decision.js:174-176',
+      why: 'This replaces the middleware\'s runtime check against <code>activePageVariants</code> from Experience Edge. The edge cannot afford that GraphQL round trip, so the list is baked into the bundle instead.',
+      fail: 'The trade-off is a redeploy whenever Sitecore variants are added or renamed. Skipping the check would let a stale flow route to a nonexistent page — and Akamai would then cache that 404 for the entire bucket.'
+    },
+    {
+      lane: 1, title: 'Rewrite the forward path and set the bucket', sub: 'the only place the variant URL exists',
+      scn: ['cold','steady','newhit','pv'], tag: 'good',
+      what: 'Three things happen together: the cache-key variable becomes the variant, the origin-bound path becomes the variant item\'s path, and the GTM payload is stashed on an internal header for the response handler.',
+      wire: "request.setVariable('PMUSER_EW_BUCKET', 'variant-a')\n\nrequest.route({ path: '/Page%20Variants/Variant%20A' })\n\nx-ew-pz-gtm: <urlencoded>\n  { \"browserId\": \"…\",\n    \"experiences\": [{ \"friendlyId\": \"…\",\n                      \"variantId\": \"Variant A\",\n                      \"type\": \"page\" }] }",
+      code: 'akamai/edgeworker/main.js:140-160',
+      why: 'Identical in shape to the middleware\'s <code>basePath = `${basePath}/Page Variants/${pageVariantId}`</code> rewrite, so the origin resolves the same Sitecore item. The client-facing URL is never touched.',
+      fail: 'The edge percent-encodes the segment (<code>Page%20Variants</code>) where the Next.js rewrite passes a literal space. Confirm the origin route resolves both spellings.'
+    },
+    {
+      lane: 1, title: 'Cache lookup', sub: 'key = URL + PMUSER_EW_BUCKET',
+      scn: PERSONALIZED,
+      what: 'Only now does Akamai look for a cached object — with the bucket already folded into the key. Six possible entries for one URL: five variants plus <code>default</code>.',
+      why: 'Because the decision ran first, the lookup is exact. There is no "cache then personalize" window where the wrong visitor sees the wrong variant.'
+    },
+    {
+      lane: 1, title: 'HIT — serve from the edge', sub: 'the origin is never contacted', tag: 'good',
+      scn: ['steady','newhit','prefetch','failopen'],
+      what: 'The cached HTML for that bucket is returned. Zero origin load, zero SSR, zero Layout Service calls, zero Experience Edge queries.',
+      why: 'This is the point of the whole exercise. Today the homepage cannot be cached at all, because the personalization decision lives inside the response. Moving the decision in front of the cache turns a per-request render into a per-bucket render.'
+    },
+    {
+      lane: 1, title: 'MISS — go to origin', sub: 'forward the rewritten request', to: 3, tag: 'net',
+      scn: MISS,
+      what: 'Akamai forwards the request to the origin using the rewritten path and the <code>x-edge-personalize</code> header, plus the internal state headers.',
+      wire: "GET /Page%20Variants/Variant%20A HTTP/1.1\nHost: <origin hostname>\nx-edge-personalize: 1\nx-ew-pz-bucket: variant-a\nx-ew-pz-bid: <browser id>      (new visitors only)\nx-ew-pz-bid-new: 1             (new visitors only)",
+      code: 'akamai/edgeworker/main.js:152, 162-166',
+      fail: 'The <code>x-ew-pz-*</code> headers reach the origin as well. They are harmless today, but they carry a per-visitor browser id into a request whose response will be shared with a whole bucket — worth confirming the origin never echoes them into the HTML.'
+    },
+    {
+      lane: 3, title: 'Ingress to the Next.js pod', sub: 'nginx ingress → ClusterIP service → container', deep: true,
+      scn: MISS,
+      what: 'The origin is the JSS Next.js app packaged by <code>charts/ccl-home</code>: an nginx-class Ingress in front of a ClusterIP service on port 80, with a horizontal pod autoscaler between 1 and 3 replicas at 60% CPU.',
+      wire: "hosts:    ccl-home.cluster0.nonprod.carnivalcloud.net,\n          www1.uatcarnival.com\npaths:    /ccl-home\nresources: 250m–1 CPU · 2 Gi memory\nautoscaling: 1–3 replicas @ 60% CPU\nliveness: GET /api/healthz",
+      code: 'charts/ccl-home/values.yaml · templates/ingress.yaml',
+      why: 'One to three pods is a thin margin for an uncached homepage. It is also the strongest argument for this EdgeWorker: with per-bucket caching, homepage traffic stops scaling with the pod count.'
+    },
+    {
+      lane: 3, title: 'Origin middleware must stand down', sub: 'engage plugin skips on x-edge-personalize', tag: 'warn',
+      scn: MISS,
+      what: 'The personalize plugin\'s <code>disabled()</code> predicate has to recognize the header and return early, leaving the already-rewritten path alone.',
+      wire: "disabled: (req) =>\n  process.env.NEXT_PUBLIC_ENABLE_PERSONALIZATION === 'false' ||\n  req?.headers.get('x-edge-personalize') === '1',",
+      code: 'src/lib/middleware/plugins/engage.ts:49',
+      fail: 'Not implemented yet. As the code stands, a cache miss runs the whole origin chain again — GraphQL page-variant lookup, Engage server init, a second <code>callFlows</code>, layout-service fetch, component-level personalization — and layers per-user component variants into markup that Akamai is about to share with everyone in the bucket. This is the one origin change the design depends on.'
+    },
+    {
+      lane: 3, title: 'Render the variant route', sub: 'ISR via getStaticProps, revalidate 5s',
+      scn: MISS,
+      what: 'The catch-all page resolves the Sitecore item at <code>/Page Variants/Variant A</code>, fetches layout data and renders. Static generation is incremental with <code>fallback: \'blocking\'</code> and a five-second revalidation window.',
+      code: 'src/pages/[[...path]].tsx:86-100',
+      why: 'Two caches now sit in series: Next.js ISR at the origin and Akamai at the edge. The edge TTL should be the longer of the two and is what actually governs how often the origin is touched.'
+    },
+    {
+      lane: 1, title: 'Store under the bucket key', sub: 'TTL override, strip Set-Cookie, no-store downstream', to: 1,
+      scn: MISS, tag: 'warn',
+      what: 'Property Manager caching rules do the work here, not the worker: force an edge TTL over the origin\'s non-cacheable <code>Cache-Control</code>, remove any <code>Set-Cookie</code> the origin emitted, and mark the response <code>no-store</code> for browsers and intermediate proxies.',
+      wire: "Edge TTL:        override origin (e.g. 10m–1h) + serve stale on error\nDownstream:      Cache-Control: no-store / private\nRemove header:   Set-Cookie  (from the cached object)\nCache ID:        exclude utm_*, gclid, fbclid",
+      fail: 'Missing any one of these is a correctness bug, not a tuning issue. An origin <code>Set-Cookie</code> that survives into the cached object is replayed to every visitor in the bucket; a cacheable downstream response means a shared proxy could hand variant A\'s HTML to a variant B visitor.'
+    },
+    {
+      lane: 1, title: 'onClientResponse sets the cookies', sub: 'runs on hits and misses alike',
+      scn: PERSONALIZED,
+      what: 'New visitors get their browser id persisted; personalized visitors get the decision payload for client-side analytics. Both are set per request, after the cache, so they are never part of the cached object.',
+      wire: "Set-Cookie: bid_<clientKey>=<ref>; Path=/;\n            Max-Age=31536000; SameSite=None; Secure\n\nSet-Cookie: sc_personalize_gtm=<urlencoded json>;\n            Path=/; SameSite=Lax",
+      code: 'akamai/edgeworker/main.js:177-213',
+      fail: '<code>COOKIE_DOMAIN</code> is empty in <code>config.js</code>, which makes both cookies host-only. The origin uses <code>NEXT_PUBLIC_ENGAGE_COOKIE_DOMAIN</code> (e.g. <code>.carnival.com</code>). If they disagree, a visitor can end up with two browser ids across subdomains.'
+    },
+    {
+      lane: 0, title: 'Response reaches the visitor', sub: '200 · URL is still /', to: 0, tag: 'good',
+      scn: ALL,
+      what: 'The visitor receives the variant\'s HTML at the canonical URL. With <code>x-ew-pz-debug: 1</code> on the request, the response also carries <code>x-ew-pz-bucket</code> naming the chosen bucket.',
+      wire: 'x-ew-pz-bucket: variant-a   (only when x-ew-pz-debug is sent)',
+      code: 'akamai/edgeworker/main.js:211-213',
+      why: 'The debug header is the fastest way to verify a decision in staging without reading DataStream logs.'
+    },
+    {
+      lane: 0, title: 'Browser forwards the decision to analytics', sub: 'PersonalizeGtmSync → dataLayer + Tealium',
+      scn: ['cold','steady','newhit','pv','failopen'],
+      what: 'A mount-time effect reads <code>sc_personalize_gtm</code>, decodes it (up to three <code>decodeURIComponent</code> passes), pushes a <code>sitecore_personalize</code> event to the GTM dataLayer, waits up to five seconds for <code>utag</code> to load, sends the same payload to Tealium and then clears the cookie.',
+      wire: "window.dataLayer.push({\n  event: 'sitecore_personalize',\n  bid: <browserId>,\n  vifp: <cclUser.PastGuestNumber>,\n  experiences: [{ friendlyId, variantId, type: 'page' }]\n})",
+      code: 'src/components/PersonalizeGtmSync/PersonalizeGtmSync.tsx:49-127',
+      why: 'This component is unchanged. The EdgeWorker writes exactly the cookie it already expected from the middleware, which is why analytics required no work on the origin side.'
+    }
+  ];
+
+  var PARITY = [
+    ['Browser id endpoint', '<code>@sitecore/engage</code> <code>getBrowserIdFromCdp()</code>', '<code>GET /v1.2/browser/create.json</code>, same query shape', 'ok', 'Match'],
+    ['Decision endpoint', '<code>engageServer.personalize()</code> → <code>POST /v2/callFlows</code>', 'Hand-rolled <code>POST /v2/callFlows</code>, same body fields', 'ok', 'Match'],
+    ['Experience params', 'referrer + nested <code>utm</code>/<code>qs</code>/<code>cookies</code>, flattened with <code>_</code> by the SDK', 'Pre-flattened <code>referrer</code>, <code>utm_*</code>, <code>qs_*</code>, <code>cookies_*</code>', 'ok', 'Match'],
+    ['Cookie payload size', 'Every cookie, uncapped', '≤1 KB per value, ≤8 KB total', 'warn', 'Confirm'],
+    ['Variant allow-list', '<code>activePageVariants</code> from Experience Edge, per request', '<code>allowedVariants</code> baked into <code>config.js</code>', 'warn', 'Redeploy needed'],
+    ['Rewrite target', '<code>${basePath}/Page Variants/${variantId}</code>', '<code>${basePath}/Page%20Variants/${variantId}</code>', 'warn', 'Confirm encoding'],
+    ['Test override', '<code>?pv=</code> returns the raw value', '<code>?pv=</code>, then validated against the allow-list', 'ok', 'Edge is stricter'],
+    ['Component variants', '<code>?dv=</code> plus per-component flow calls', 'Not implemented — by design', 'ok', 'Out of scope'],
+    ['Decision timeout', '10 000 ms in <code>getVariantByPageId()</code>', '1000 ms + 1500 ms', 'warn', 'Edge abandons sooner'],
+    ['Market resolution', '<code>getPersonalizeContext()</code>, default <code>en-US</code>', 'Same maps, default <code>en</code>', 'ok', 'Same outcome'],
+    ['Browser id cookie', '<code>bid_&lt;key&gt;</code>, 365 days, server cookie mode', '<code>bid_&lt;key&gt;</code>, 365 days, <code>SameSite=None; Secure</code>', 'ok', 'Match'],
+    ['Analytics cookie', '<code>sc_personalize_gtm</code>, JSON, <code>SameSite=Lax</code>', 'Same name, URL-encoded JSON, <code>SameSite=Lax</code>', 'ok', 'Match'],
+    ['Prefetch handling', '<code>isPrefetch()</code> skips the experience', 'Same four header checks', 'ok', 'Match']
+  ];
+
+  var BLOCKERS = [
+    { sev: 'crit', h: 'The origin does not skip personalization',
+      p: 'The middleware plugin still disables only on the environment flag. It does not look at <code>x-edge-personalize</code>, so on a cache miss the origin runs the full personalize chain a second time and layers per-user component variants into markup Akamai is about to share.',
+      w: 'src/lib/middleware/plugins/engage.ts:49' },
+    { sev: 'crit', h: 'config.js is still a template',
+      p: '<code>CLIENT_KEY</code>, <code>friendlyId</code> and all five variant names are <code>TODO_</code> placeholders. The bundle will register and activate, and then quietly serve every visitor the default bucket.',
+      w: 'akamai/edgeworker/config.js:15, 55, 58-64' },
+    { sev: 'warn', h: 'Cookie domain is unset',
+      p: '<code>COOKIE_DOMAIN: \'\'</code> makes the browser id host-only, where the origin scopes it with <code>NEXT_PUBLIC_ENGAGE_COOKIE_DOMAIN</code>. Mismatched scopes split one guest into two.',
+      w: 'akamai/edgeworker/config.js:104' },
+    { sev: 'warn', h: 'Only the US homepage is in scope',
+      p: '<code>ROUTES[0].paths</code> is <code>[\'/\']</code>. The AU and NZ homepages keep going through the origin middleware, which means two personalization paths run side by side.',
+      w: 'akamai/edgeworker/config.js:47' },
+    { sev: 'info', h: 'None of the property config is in the repo',
+      p: 'The variable declaration, the <code>/__engage</code> pass-through, the caching rules and the EdgeWorkers behaviour all live in Property Manager. Nothing in this repository can prove they exist.',
+      w: 'Akamai property configuration' },
+    { sev: 'info', h: 'No automated tests cover the worker',
+      p: 'There are no unit tests for <code>decision.js</code> — the variant extraction, param flattening and market resolution are the parts most likely to drift from the middleware, and they are pure functions that would be cheap to test.',
+      w: 'akamai/edgeworker/' }
+  ];
+
+  var PM_ROWS = [
+    ['1', 'User-defined variable', '<code>PMUSER_EW_BUCKET</code>, empty default', 'Without it, <code>setVariable()</code> throws and the worker silently no-ops on every request.'],
+    ['2', 'EdgeWorkers behaviour', 'Scoped to the personalized paths', 'The worker returns early elsewhere anyway; scoping just avoids paying for the execution.'],
+    ['3', 'Path match <code>/__engage/*</code>', 'Origin = the Engage host; strip the <code>/__engage</code> prefix; <code>no-store</code>; allow POST', 'EdgeWorkers sub-requests can only reach Akamaized hosts. <code>callFlows</code> is a POST, which is rejected by default. Sub-requests do not re-trigger EdgeWorkers, so there is no loop.'],
+    ['4', 'Caching for the personalized routes', 'Edge TTL override + serve stale on error; downstream <code>no-store</code>; remove <code>Set-Cookie</code>; exclude marketing params from the cache ID', 'The SSR homepage answers with a non-cacheable <code>Cache-Control</code>, so without an override nothing is ever stored and every request becomes a miss.']
+  ];
+
+  var CHECKS = [
+    ['<code>PMUSER_EW_BUCKET</code> is declared in the property', 'Deploy, then request the homepage. If the bucket never changes from <code>default</code>, check DataStream for <code>pz: onClientRequest failed</code> — an undeclared variable is the usual cause.'],
+    ['The cache key contains the bucket', 'Send <code>Pragma: akamai-x-get-cache-key</code> and confirm the returned key includes the variable.'],
+    ['Two buckets produce two cached objects', 'Request <code>?pv=Variant%20A</code> and <code>?pv=Variant%20B</code>, then compare the HTML at the plain <code>/</code> URL for each bucket. Different bodies, same URL.'],
+    ['<code>/__engage/*</code> forwards correctly', 'Curl <code>/__engage/v1.2/browser/create.json?client_key=…&amp;message=%7B%7D</code> directly through the property and expect a <code>ref</code>.'],
+    ['POST is allowed on the Engage rule', 'Watch <code>akamai-x-ew-debug-subs</code> for the <code>callFlows</code> sub-request. A 405 here means the rule still rejects POST.'],
+    ['Both sub-requests appear on a first visit, one on the second', 'Cookieless request, then repeat with the returned <code>bid_</code> cookie.'],
+    ['<code>x-ew-pz-bucket</code> reflects the decision', 'Send <code>x-ew-pz-debug: 1</code> and read the response header.'],
+    ['An invalid <code>?pv=</code> falls back to default', 'Request <code>?pv=NotAVariant</code>. Expect bucket <code>default</code> and a 200 — never a cached 404.'],
+    ['The origin skips personalization', 'Apply the <code>disabled()</code> change first, then confirm the origin logs show the personalize middleware skipping when <code>x-edge-personalize: 1</code> is present.'],
+    ['<code>Set-Cookie</code> is stripped from cached origin responses', 'Force a miss, then request the same bucket again and confirm no origin cookie is replayed on the hit.'],
+    ['The response is <code>no-store</code> downstream', 'Check <code>Cache-Control</code> on the client response — variant HTML must not be cacheable by browsers or shared proxies.'],
+    ['The edge TTL override actually applies', 'The SSR response is non-cacheable by default. Confirm a second request for the same bucket is a hit.'],
+    ['Marketing parameters do not fragment the cache', 'Request with and without <code>?utm_source=test</code> and confirm both resolve to the same cached object.'],
+    ['<code>bid_&lt;clientKey&gt;</code> is set once and reused', 'Confirm the cookie appears on the first response, is absent on the second, and carries the intended domain.'],
+    ['<code>sc_personalize_gtm</code> decodes and fires', 'Load a personalized page in a browser and confirm a <code>sitecore_personalize</code> event lands in the dataLayer and the cookie is cleared.'],
+    ['CDP records an execution on cache hits', 'Hit a warm bucket repeatedly and confirm the experience execution count rises in Personalize.'],
+    ['Prefetches do not call the flow', 'Send <code>next-router-prefetch: 1</code> and confirm no <code>callFlows</code> sub-request in the debug output.'],
+    ['Personalize going down does not take the page down', 'Block <code>/__engage/*</code> at the property, then confirm the homepage still serves under the <code>default</code> bucket.'],
+    ['<code>allowedVariants</code> matches Sitecore exactly', 'Compare against the item names under the homepage\'s <em>Page Variants</em> folder, including capitalization and spacing.'],
+    ['Bot traffic is accounted for', 'Every cookieless request creates a CDP guest. Decide whether Bot Manager gates the worker\'s routes before this goes to production.']
+  ];
+
+  var RISKS = [
+    { sev: 'warn', h: 'Every cookieless request creates a CDP guest',
+      p: 'Crawlers, uptime monitors and scrapers all arrive without a <code>bid_</code> cookie, so each one mints a guest record. The README suggests gating the routes behind Bot Manager or short-circuiting known bots to the default bucket before the worker runs.' },
+    { sev: 'warn', h: 'Variant changes require a bundle redeploy',
+      p: 'Moving the allow-list from Experience Edge into <code>config.js</code> buys a round trip but couples content changes to an EdgeWorker release. Whoever owns Sitecore content needs to know that adding a variant is now a deployment.' },
+    { sev: 'warn', h: 'Two caches in series',
+      p: 'Next.js ISR revalidates every 5 seconds while the edge TTL is measured in minutes to an hour. Content freshness is governed by the edge TTL and by purges — the ISR window becomes largely decorative for these routes.' },
+    { sev: 'info', h: 'Component personalization stays at the origin',
+      p: 'Per-component variants would multiply the cache-key space and defeat the point. Pages served through this worker get page-variant bucketing only, so any component-level experiment on the homepage must be re-thought or moved to a page variant.' },
+    { sev: 'info', h: 'The decision cost is paid on every request',
+      p: 'A cache hit still costs one <code>callFlows</code> round trip from the edge. That is a deliberate trade for analytics accuracy — the alternative, caching the decision, would under-count experience executions.' },
+    { sev: 'info', h: 'Failures are silent by design',
+      p: 'Every failure path serves a correct page and logs to <code>logger.error</code>. That is right for availability, but it means monitoring has to come from DataStream 2 — nothing user-visible signals that personalization stopped working.' }
+  ];
+
+  var GLOSSARY = [
+    ['EdgeWorker', 'JavaScript that Akamai runs on its own servers as a request passes through, before it ever reaches ours.'],
+    ['Bucket', 'A group of visitors who see the same version of the homepage. Five variants plus a default, so six buckets.'],
+    ['Cache key', 'The identity Akamai uses to file and find a stored page. Adding the bucket to it is what lets one URL hold six different pages.'],
+    ['Sitecore Personalize (CDP)', 'The system that decides which variant a visitor should see, based on their behaviour and context.'],
+    ['Flow', 'A Personalize experience — the rules that sort a visitor into a variant.'],
+    ['Browser id (bid)', 'The anonymous identifier that keeps a visitor in the same bucket across visits.'],
+    ['Fail open', 'When something goes wrong, show the standard page rather than an error. Personalization is an enhancement, never a dependency.'],
+    ['Origin', 'Our Next.js application, running in Kubernetes. Everything Akamai cannot answer itself comes from here.'],
+    ['ISR', 'Incremental Static Regeneration — the origin caches its own rendered pages and refreshes them on a timer.']
+  ];
+
+  /* ------------------------------------------------------------------ state */
+
+  var state = { mode: 'deep', scenario: 'cold', notes: {}, checks: {} };
+
+  function load() {
+    try {
+      var raw = localStorage.getItem('ew-trace-v1');
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && typeof s === 'object') {
+          state.notes = s.notes || {};
+          state.checks = s.checks || {};
+          if (s.mode) state.mode = s.mode;
+        }
+      }
+    } catch (e) { /* private mode, blocked storage — carry on */ }
+  }
+  function save() {
+    try {
+      localStorage.setItem('ew-trace-v1', JSON.stringify({
+        notes: state.notes, checks: state.checks, mode: state.mode
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function el(tag, cls, html) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html !== undefined) n.innerHTML = html;
+    return n;
+  }
+  function laneColor(i) { return LANES[i].color; }
+
+  /* ------------------------------------------------------------------ trace */
+
+  function visibleSteps() {
+    return STEPS.filter(function (s) {
+      if (s.scn.indexOf(state.scenario) === -1) return false;
+      if (state.mode === 'brief' && s.deep) return false;
+      return true;
+    });
+  }
+
+  function renderLanes() {
+    var host = document.getElementById('lanes');
+    host.innerHTML = '';
+    LANES.forEach(function (l) {
+      var d = el('div', 'lane-h');
+      d.innerHTML = '<i style="background:' + l.color + '"></i>' + l.name +
+        ' <span>' + l.sub + '</span>';
+      host.appendChild(d);
+    });
+  }
+
+  function connector(fromLane, toLane) {
+    var c = el('div', 'conn');
+    var x1 = ((fromLane + 0.5) / 4) * 100;
+    var x2 = ((toLane + 0.5) / 4) * 100;
+    c.innerHTML =
+      '<svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path d="M ' + x1 + ' 0 C ' + x1 + ' 18, ' + x2 + ' 12, ' + x2 + ' 26" ' +
+      'fill="none" stroke="var(--line-strong)" stroke-width="1.5" ' +
+      'vector-effect="non-scaling-stroke" stroke-dasharray="' +
+      (fromLane === toLane ? '0' : '4 3') + '"/></svg>' +
+      '<span class="head" style="left:' + x2 + '%"></span>';
+    return c;
+  }
+
+  function renderTrace() {
+    var host = document.getElementById('trace-body');
+    host.innerHTML = '';
+    var steps = visibleSteps();
+    var prevLane = null;
+
+    steps.forEach(function (s, i) {
+      if (prevLane !== null) host.appendChild(connector(prevLane, s.lane));
+
+      var row = el('div', 'trow');
+      var btn = el('button', 'node' + (state.notes[s.title] ? ' has-note' : ''));
+      btn.style.gridColumn = String(s.lane + 1);
+      btn.style.setProperty('--lanec', laneColor(s.lane));
+      btn.setAttribute('type', 'button');
+
+      var tag = s.tag ? '<span class="tag ' + s.tag + '">' +
+        ({ net: 'network', stop: 'exit', good: 'win', warn: 'careful' }[s.tag]) + '</span>' : '';
+      var chip = '<span class="lane-chip"><i style="background:' + laneColor(s.lane) + '"></i>' +
+        LANES[s.lane].name + '</span>';
+
+      btn.innerHTML =
+        '<span class="n">' + String(i + 1).padStart(2, '0') + tag + chip + '</span>' +
+        '<span class="t">' + s.title + '</span>' +
+        '<span class="s">' + s.sub + '</span>';
+      btn.addEventListener('click', function () { openDrawer(s); });
+
+      row.appendChild(btn);
+      host.appendChild(row);
+      prevLane = s.lane;
+    });
+  }
+
+  function renderScenarioUI() {
+    var list = document.getElementById('scn-list');
+    list.innerHTML = '';
+    SCENARIOS.forEach(function (sc) {
+      var b = el('button', 'scn');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(sc.id === state.scenario));
+      b.innerHTML = '<span class="dot"></span>' + sc.label;
+      b.addEventListener('click', function () {
+        state.scenario = sc.id;
+        renderScenarioUI(); renderTrace();
+      });
+      list.appendChild(b);
+    });
+
+    var sc = SCENARIOS.filter(function (x) { return x.id === state.scenario; })[0];
+    var out = document.getElementById('scn-readout');
+    out.innerHTML =
+      cell('Bucket served', sc.bucket) +
+      cell('CDP sub-requests', sc.subreq) +
+      cell('Origin touched', sc.origin) +
+      cell('Timeout ceiling', sc.ceiling) +
+      '<div class="scn-note">' + sc.note + '</div>';
+  }
+  function cell(k, v) {
+    return '<div><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+  }
+
+  /* ------------------------------------------------------------------ drawer */
+
+  var drawer = document.getElementById('drawer');
+  var scrim = document.getElementById('scrim');
+  var activeStep = null;
+
+  function openDrawer(s) {
+    activeStep = s;
+    document.getElementById('d-meta').textContent =
+      LANES[s.lane].name + ' · ' + LANES[s.lane].sub;
+    document.getElementById('d-title').textContent = s.title;
+
+    var body = document.getElementById('d-body');
+    body.innerHTML = '';
+
+    body.appendChild(field('What happens', '<p>' + s.what + '</p>'));
+    if (s.wire) body.appendChild(field('On the wire', '<pre class="wire">' + esc(s.wire) + '</pre>'));
+    if (s.code) {
+      var refs = s.code.split(' · ').map(function (r) {
+        return '<span class="srcref">' + r + '</span>';
+      }).join('');
+      body.appendChild(field('Source', refs));
+    }
+    if (s.why) body.appendChild(field('Why it is built this way', '<p>' + s.why + '</p>'));
+    if (s.fail) body.appendChild(field('Failure mode / caveat', '<div class="fail">' + s.fail + '</div>'));
+
+    var note = el('div', 'dfield deep-only');
+    note.innerHTML = '<h5>Your note on this step</h5>';
+    var box = el('div', 'note-box');
+    var ta = el('textarea');
+    ta.placeholder = 'Question, correction, or something to check with the Akamai team…';
+    ta.value = state.notes[s.title] || '';
+    var row = el('div', 'btn-row');
+    var savebtn = el('button', 'btn', 'Save note');
+    var delbtn = el('button', 'btn ghost', 'Remove');
+    savebtn.addEventListener('click', function () {
+      var v = ta.value.trim();
+      if (v) state.notes[s.title] = { lane: LANES[s.lane].name, sub: s.sub, text: v };
+      else delete state.notes[s.title];
+      save(); renderTrace(); renderPrompt(); closeDrawer();
+    });
+    delbtn.addEventListener('click', function () {
+      delete state.notes[s.title]; ta.value = '';
+      save(); renderTrace(); renderPrompt();
+    });
+    row.appendChild(savebtn); row.appendChild(delbtn);
+    box.appendChild(ta); box.appendChild(row);
+    note.appendChild(box);
+    body.appendChild(note);
+
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+    scrim.classList.add('open');
+    document.getElementById('d-close').focus();
+  }
+  function field(label, html) {
+    var f = el('div', 'dfield');
+    f.innerHTML = '<h5>' + label + '</h5>' + html;
+    return f;
+  }
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    scrim.classList.remove('open');
+    activeStep = null;
+  }
+  document.getElementById('d-close').addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+  });
+
+  /* ------------------------------------------------------------------ static sections */
+
+  function renderBuckets() {
+    var host = document.getElementById('buckets');
+    host.innerHTML = '';
+    ['Variant A', 'Variant B', 'Variant C', 'Variant D', 'Variant E'].forEach(function (v) {
+      var b = el('div', 'bucket');
+      b.innerHTML = '<div class="bn">' + v.replace(' ', '-').toLowerCase() + '</div>' +
+        '<div class="bu">forwards to <code>/Page%20Variants/' + v.replace(' ', '%20') + '</code></div>';
+      host.appendChild(b);
+    });
+    var d = el('div', 'bucket def');
+    d.innerHTML = '<div class="bn">default</div>' +
+      '<div class="bu">no rewrite — control group, prefetches, timeouts, unknown variants and every failure path</div>';
+    host.appendChild(d);
+  }
+
+  function renderParity() {
+    var tb = document.getElementById('parity-rows');
+    tb.innerHTML = PARITY.map(function (r) {
+      return '<tr><td><strong>' + r[0] + '</strong></td><td>' + r[1] + '</td><td>' + r[2] +
+        '</td><td><span class="pill ' + r[3] + '">' + r[4] + '</span></td></tr>';
+    }).join('');
+  }
+
+  function renderCards(hostId, items) {
+    var host = document.getElementById(hostId);
+    host.innerHTML = items.map(function (c) {
+      return '<div class="card ' + c.sev + '"><h4>' + c.h + '</h4><p>' + c.p + '</p>' +
+        (c.w ? '<div class="where">' + c.w + '</div>' : '') + '</div>';
+    }).join('');
+  }
+
+  function renderPM() {
+    document.getElementById('pm-rows').innerHTML = PM_ROWS.map(function (r) {
+      return '<tr><td class="mono">' + r[0] + '</td><td><strong>' + r[1] + '</strong></td><td>' +
+        r[2] + '</td><td>' + r[3] + '</td></tr>';
+    }).join('');
+  }
+
+  function renderChecks() {
+    var host = document.getElementById('check-list');
+    host.innerHTML = '';
+    CHECKS.forEach(function (c, i) {
+      var key = 'c' + i;
+      var d = el('div', 'check' + (state.checks[key] ? ' done' : ''));
+      var cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = !!state.checks[key];
+      cb.id = 'chk-' + i;
+      cb.addEventListener('change', function () {
+        state.checks[key] = cb.checked;
+        save(); renderChecks(); renderPrompt();
+      });
+      var lab = el('label');
+      lab.setAttribute('for', 'chk-' + i);
+      lab.innerHTML = '<div class="ct">' + c[0] + '</div><div class="cd">' + c[1] + '</div>';
+      d.appendChild(cb); d.appendChild(lab);
+      host.appendChild(d);
+    });
+    var done = CHECKS.filter(function (_, i) { return state.checks['c' + i]; }).length;
+    document.getElementById('prog-label').textContent = done + ' / ' + CHECKS.length + ' verified';
+    document.getElementById('prog-bar').style.width = (done / CHECKS.length * 100) + '%';
+  }
+
+  function renderGlossary() {
+    document.getElementById('gloss-list').innerHTML = GLOSSARY.map(function (g) {
+      return '<div><dt>' + g[0] + '</dt><dd>' + g[1] + '</dd></div>';
+    }).join('');
+  }
+
+  /* ------------------------------------------------------------------ prompt */
+
+  function renderPrompt() {
+    var keys = Object.keys(state.notes);
+    var openChecks = CHECKS.filter(function (_, i) { return !state.checks['c' + i]; });
+    var sc = SCENARIOS.filter(function (x) { return x.id === state.scenario; })[0];
+    var parts = [];
+
+    parts.push('I am reviewing the Sitecore Personalize EdgeWorker in `akamai/edgeworker/` of the ccl-home repo — it moves page-variant bucketing to the Akamai edge so the homepage can be served from CDN cache. I walked the "' + sc.label + '" path in the architecture trace.');
+
+    if (keys.length) {
+      parts.push('\nNotes I left on specific steps:\n');
+      keys.forEach(function (k) {
+        var n = state.notes[k];
+        parts.push('**' + k + '** (' + n.lane + ' — ' + n.sub + ')\n' + n.text + '\n');
+      });
+    }
+
+    var verified = CHECKS.length - openChecks.length;
+    if (verified > 0) {
+      parts.push('\nVerification status: ' + verified + ' of ' + CHECKS.length +
+        ' checks confirmed on staging.');
+      if (openChecks.length && openChecks.length <= 8) {
+        parts.push('Still outstanding:\n' + openChecks.map(function (c) {
+          return '- ' + c[0].replace(/<[^>]+>/g, '');
+        }).join('\n'));
+      }
+    }
+
+    if (!keys.length && verified === 0) {
+      parts.push('\nNothing annotated yet — click a step in the trace to leave a note, or tick off verification items, and this prompt will carry them back into the conversation.');
+    } else {
+      parts.push('\nHelp me resolve these against the actual code.');
+    }
+
+    var text = parts.join('\n');
+    document.getElementById('prompt-out').textContent = text;
+    document.getElementById('prompt-summary').innerHTML =
+      '<b>' + keys.length + '</b> note' + (keys.length === 1 ? '' : 's') +
+      ' &middot; <b>' + verified + '/' + CHECKS.length + '</b> checks verified &middot; scenario: <b>' +
+      sc.label + '</b>';
+    return text;
+  }
+
+  document.getElementById('copy-prompt').addEventListener('click', function () {
+    var btn = this;
+    var text = renderPrompt();
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+  });
+
+  document.getElementById('clear-notes').addEventListener('click', function () {
+    state.notes = {}; save(); renderTrace(); renderPrompt();
+  });
+
+  /* ------------------------------------------------------------------ mode */
+
+  function setMode(m) {
+    state.mode = m;
+    document.body.setAttribute('data-mode', m);
+    document.getElementById('m-brief').setAttribute('aria-pressed', String(m === 'brief'));
+    document.getElementById('m-deep').setAttribute('aria-pressed', String(m === 'deep'));
+    save(); renderTrace();
+  }
+  document.getElementById('m-brief').addEventListener('click', function () { setMode('brief'); });
+  document.getElementById('m-deep').addEventListener('click', function () { setMode('deep'); });
+
+  /* ------------------------------------------------------------------ init */
+
+  load();
+  document.body.setAttribute('data-mode', state.mode);
+  document.getElementById('m-brief').setAttribute('aria-pressed', String(state.mode === 'brief'));
+  document.getElementById('m-deep').setAttribute('aria-pressed', String(state.mode === 'deep'));
+  renderLanes();
+  renderScenarioUI();
+  renderTrace();
+  renderBuckets();
+  renderParity();
+  renderCards('blocker-cards', BLOCKERS);
+  renderCards('risk-cards', RISKS);
+  renderPM();
+  renderChecks();
+  renderGlossary();
+  renderPrompt();
+})();
+</script>
+
+</body>
+</html>
