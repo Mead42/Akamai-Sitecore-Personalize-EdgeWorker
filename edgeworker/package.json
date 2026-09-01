@@ -1,0 +1,9 @@
+{
+  "name": "sitecore-personalize-edgeworker",
+  "private": true,
+  "type": "module",
+  "description": "Local dev/test support only — NOT part of the EdgeWorkers bundle (the tar in the README lists the bundle files explicitly). \"type\": \"module\" lets Node run the EdgeWorker's ES modules for the local test harness.",
+  "scripts": {
+    "test": "node --import ./test/register.mjs --test \"./test/*.test.js\""
+  }
+}
